@@ -1,0 +1,29 @@
+# Projects this dashboard tracks.
+#
+# Each entry is one project. Fields:
+#   name:        Display name (also the slug shown in URLs and dashboard tables).
+#   color:       Hex color used in charts and badges.
+#   github:      "owner/repo" if you want the dashboard to pull PR staleness.
+#   noko_dir:    Subdirectory under agents/ where Noko time-entry JSON is dumped.
+#                Defaults to `name` if omitted.
+#   agent_dir:   Subdirectory under agents/ for meeting notes + checklists.
+#                Defaults to `name` if omitted.
+#   client:      Boolean. If false the project is treated as internal/non-billable
+#                and excluded from billable-people aggregates. Defaults to true.
+
+projects:
+  - name: ProjectAlpha
+    color: "#6366f1"   # indigo
+    github: example-org/project-alpha
+    noko_dir: ProjectAlpha
+    agent_dir: ProjectAlpha
+    client: true
+
+  - name: ProjectBeta
+    color: "#22c55e"   # green
+    github: example-org/project-beta
+    client: true
+
+  - name: Internal
+    color: "#64748b"   # grey
+    client: false

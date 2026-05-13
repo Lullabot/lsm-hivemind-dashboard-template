@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+{% block title %}Automations — PM Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Automations</h2>
+    <p class="page-subtitle">Scheduled jobs and services managed via macOS launchd</p>
+  </div>
+</div>
+
+{# ---- Stats Row ---- #}
+{% set daily_count = automations | selectattr("frequency", "equalto", "daily") | list | length %}
+{% set weekly_count = automations | selectattr("frequency", "equalto", "weekly") | list | length %}
+{% set service_count = automations | selectattr("frequency", "equalto", "service") | list | length %}
+{% set active_count = automations | selectattr("running") | list | length %}
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">Total Jobs</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ automations | length }}</span>
+      <span class="stat-badge badge-accent">Configured</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Active</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ active_count }}</span>
+      {% if active_count == automations | length %}
+        <span class="stat-badge badge-success">All running</span>
+      {% else %}
+        <span class="stat-badge badge-warning">{{ automations | length - active_count }} stopped</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Daily</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ daily_count }}</span>
+      <span class="stat-badge badge-info">Scheduled</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Weekly</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ weekly_count }}</span>
+      <span class="stat-badge badge-info">Scheduled</span>
+    </div>
+  </div>
+</div>
+
+<div class="sortable-panels">
+{# ---- Run History Heatmap ---- #}
+{% if run_history and run_history.dates %}
+<section class="section-card" data-panel-id="auto-history" style="margin-top: 1rem; padding: 0; overflow: hidden;">
+  <div class="section-header" style="padding: 0.75rem 1rem;">
+    <h3>Run History</h3>
+    <span class="section-meta">Last {{ run_history.dates | length }} days</span>
+  </div>
+  <div class="rh-grid">
+    {# Header row: day labels #}
+    <div class="rh-row rh-header">
+      <span class="rh-label"></span>
+      {% for date in run_history.dates %}
+      {% set day_name = date[-2:] | int %}
+      <span class="rh-day-label" data-tip="{{ date }}">{{ day_name }}</span>
+      {% endfor %}
+    </div>
+    {# Job rows #}
+    {% for job_name, runs in run_history.jobs.items() %}
+    <div class="rh-row">
+      <span class="rh-label">{{ job_name }}</span>
+      {% for date in run_history.dates %}
+      {% set status = runs.get(date, '') %}
+      {% set dow = date | int if false else none %}
+      <span class="rh-cell rh-{{ status or 'miss' }}" data-tip="{{ job_name }}&#10;{{ date }}: {{ status or 'no run' }}"></span>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ---- Management Reference ---- #}
+<div class="section-card collapsible-section" data-collapse-id="auto-management" data-panel-id="auto-management">
+  <div class="section-header collapsible-toggle">
+    <h3>Management Commands</h3>
+    <span class="section-meta">launchd</span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="auto-mgmt">
+    <div class="auto-mgmt-group">
+      <h4>Check status</h4>
+      <code>launchctl list | grep pmdashboard</code>
+    </div>
+    <div class="auto-mgmt-group">
+      <h4>Stop a job</h4>
+      <code>launchctl unload ~/Library/LaunchAgents/com.pmdashboard.&lt;name&gt;.plist</code>
+    </div>
+    <div class="auto-mgmt-group">
+      <h4>Start a job</h4>
+      <code>launchctl load ~/Library/LaunchAgents/com.pmdashboard.&lt;name&gt;.plist</code>
+    </div>
+    <div class="auto-mgmt-group">
+      <h4>Run morning briefing manually</h4>
+      <code>cd automation && ./scripts/morning-briefing.sh</code>
+    </div>
+    <div class="auto-mgmt-group">
+      <h4>Run retrospector manually</h4>
+      <code>cd automation && ./scripts/retrospector.sh</code>
+    </div>
+    <div class="auto-mgmt-group">
+      <h4>Run consolidator manually</h4>
+      <code>cd automation && ./scripts/retrospector.sh --phase consolidate</code>
+    </div>
+  </div>
+</div>
+
+{# ---- Jobs Table ---- #}
+<div class="section-card" data-panel-id="auto-jobs" style="margin-top: 1.5rem; padding: 0; overflow: hidden;">
+  <table class="auto-table">
+    <thead>
+      <tr>
+        <th class="at-name">Job</th>
+        <th class="at-schedule">Schedule</th>
+        <th class="at-status">Status</th>
+        <th class="at-script">Script</th>
+        <th class="at-page">Page</th>
+        <th class="at-activity">Last Activity</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in automations %}
+      {# ---- Parent row ---- #}
+      <tr class="at-row at-parent{% if job.children %} at-expandable{% endif %}" data-job-id="job-{{ loop.index }}">
+        <td class="at-name">
+          <div class="at-name-cell at-tip" data-tip="{{ job.description }}">
+            {% if job.children %}
+            <svg class="at-expand-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {% endif %}
+            <span class="auto-status-dot {% if job.running %}auto-dot-active{% else %}auto-dot-inactive{% endif %}" title="{{ 'Running' if job.running else 'Stopped' }}"></span>
+            <strong>{{ job.name }}</strong>
+          </div>
+        </td>
+        <td class="at-schedule">
+          <span class="at-tip" data-tip="{{ job.get('label', '') }}">{{ job.schedule }}</span>
+        </td>
+        <td class="at-status">
+          <span class="auto-freq auto-freq-{{ job.frequency }}">{{ job.frequency }}</span>
+          {% if job.get('installed', false) %}
+            <span class="stat-badge badge-success" style="margin-left: 0.25rem;">Installed</span>
+          {% elif job.get('label') %}
+            <span class="stat-badge badge-danger" style="margin-left: 0.25rem;">Not installed</span>
+          {% endif %}
+        </td>
+        <td class="at-script">
+          <code class="at-tip" data-tip="{% for o in job.outputs %}{{ o }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">{{ job.script }}</code>
+        </td>
+        <td class="at-page">
+          {% if job.get('dashboard_page') %}
+          <a href="{{ job.dashboard_page }}">{{ job.dashboard_page }}</a>
+          {% endif %}
+        </td>
+        <td class="at-activity">{{ job.get('last_activity', '') }}</td>
+      </tr>
+
+      {# ---- Child rows (indented, collapsible) ---- #}
+      {% if job.children %}
+      {% set parent_idx = loop.index %}
+      {% for child in job.children %}
+      <tr class="at-row at-child{% if loop.last %} at-child-last{% endif %}" data-parent-id="job-{{ parent_idx }}">
+        <td class="at-name">
+          <div class="at-name-cell at-indent at-tip" data-tip="{{ child.description }}">
+            <svg class="at-tree-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M6 4v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="at-child-name">{{ child.name }}</span>
+          </div>
+        </td>
+        <td class="at-schedule">
+          <span class="at-tip" data-tip="Triggered by {{ automations[parent_idx - 1].name }}">{{ child.schedule }}</span>
+        </td>
+        <td class="at-status">
+          <span class="auto-freq auto-freq-{{ child.frequency }}">{{ child.frequency }}</span>
+        </td>
+        <td class="at-script">
+          <code class="at-tip" data-tip="{% for o in child.outputs %}{{ o }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">{{ child.script }}</code>
+        </td>
+        <td class="at-page">
+          {% if child.get('dashboard_page') %}
+          <a href="{{ child.dashboard_page }}">{{ child.dashboard_page }}</a>
+          {% endif %}
+        </td>
+        <td class="at-activity"></td>
+      </tr>
+      {% endfor %}
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+</div>{# end .sortable-panels #}
+
+<style>
+/* Run history heatmap */
+.rh-grid {
+  padding: 0 1rem 0.75rem;
+}
+.rh-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.rh-header {
+  margin-bottom: 2px;
+}
+.rh-label {
+  width: 8rem;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--on-surface-variant);
+  text-align: right;
+  padding-right: 0.5rem;
+}
+.rh-day-label {
+  flex: 1;
+  text-align: center;
+  font-size: 0.6rem;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+.rh-cell {
+  flex: 1;
+  aspect-ratio: 1;
+  max-width: 24px;
+  max-height: 24px;
+  border-radius: 3px;
+  cursor: default;
+}
+.rh-ok {
+  background: var(--success, #10b981);
+  opacity: 0.8;
+}
+.rh-ok:hover { opacity: 1; }
+.rh-error {
+  background: var(--error, #f44336);
+  opacity: 0.8;
+}
+.rh-miss {
+  background: var(--surface-container-high);
+  opacity: 0.4;
+}
+.rh-miss:hover { opacity: 0.7; }
+
+/* Collapsible pattern */
+.collapsible-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.collapsible-toggle .section-meta {
+  margin-left: auto;
+}
+.collapse-chevron {
+  margin-left: 0.75rem;
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.collapsible-toggle:hover .collapse-chevron {
+  opacity: 1;
+}
+.collapsible-section.collapsed .collapse-chevron {
+  transform: rotate(-90deg);
+}
+.collapsible-section.collapsed > *:not(.section-header) {
+  display: none;
+}
+
+/* Jobs table */
+.auto-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.auto-table thead {
+  background: var(--surface-container);
+  border-bottom: 1px solid var(--outline-variant);
+}
+.auto-table th {
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+.auto-table td {
+  padding: 0.55rem 0.75rem;
+  vertical-align: top;
+  border-bottom: 1px solid var(--outline-variant);
+}
+.auto-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.auto-table code {
+  font-size: 0.75rem;
+  background: var(--surface-container-low);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  color: var(--on-surface);
+}
+
+/* Parent rows */
+.at-parent {
+  background: var(--surface);
+}
+.at-parent:hover {
+  background: var(--surface-container-low);
+}
+.at-expandable {
+  cursor: pointer;
+}
+/* Parent with children expanded: subtle border into child zone */
+.at-expandable:not(.at-collapsed) td {
+  border-bottom-color: var(--surface-container);
+}
+
+/* Child rows */
+.at-child {
+  background: var(--surface-container-low);
+}
+.at-child td {
+  border-bottom-color: var(--surface-container);
+}
+.at-child.at-hidden {
+  display: none;
+}
+/* Last child: bright border below to separate from next parent group */
+.at-child-last:not(.at-hidden) td {
+  border-bottom: 1px solid var(--outline);
+}
+/* When parent is collapsed, restore normal border on it */
+.at-expandable.at-collapsed td {
+  border-bottom-color: var(--outline-variant);
+}
+
+/* Name cell layout */
+.at-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.at-indent {
+  padding-left: 1.5rem;
+}
+.at-expand-icon {
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.at-expandable:hover .at-expand-icon {
+  opacity: 1;
+}
+.at-expandable.at-collapsed .at-expand-icon {
+  transform: rotate(-90deg);
+}
+.at-tree-icon {
+  opacity: 0.35;
+  flex-shrink: 0;
+}
+.at-child-name {
+  color: var(--on-surface-variant);
+}
+
+/* Page links */
+.at-page a {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+.at-page a:hover {
+  text-decoration: underline;
+}
+
+/* Column widths */
+.at-name { min-width: 160px; }
+.at-schedule { white-space: nowrap; }
+.at-status { white-space: nowrap; }
+.at-script { max-width: 280px; }
+.at-page { white-space: nowrap; }
+.at-activity { white-space: nowrap; font-size: 0.78rem; color: var(--on-surface-variant); }
+
+/* Responsive: stack on narrow screens */
+@media (max-width: 900px) {
+  .auto-table { font-size: 0.75rem; }
+  .auto-table th, .auto-table td { padding: 0.4rem 0.5rem; }
+  .at-script { display: none; }
+}
+</style>
+
+<script>
+(function() {
+  // Collapsible sections (management commands, descriptions)
+  var STORAGE_KEY = 'auto-collapsed-sections';
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  var state = loadState();
+  document.querySelectorAll('.collapsible-section').forEach(function(section) {
+    var id = section.getAttribute('data-collapse-id');
+    var toggle = section.querySelector('.collapsible-toggle');
+    if (!id || !toggle) return;
+    if (state[id]) section.classList.add('collapsed');
+    toggle.addEventListener('click', function() {
+      var isCollapsed = section.classList.toggle('collapsed');
+      state[id] = isCollapsed;
+      saveState(state);
+    });
+  });
+
+  // Expandable parent rows in table
+  var TABLE_KEY = 'auto-collapsed-jobs';
+  var jobState = loadJobState();
+  function loadJobState() {
+    try { return JSON.parse(localStorage.getItem(TABLE_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveJobState() {
+    localStorage.setItem(TABLE_KEY, JSON.stringify(jobState));
+  }
+
+  document.querySelectorAll('.at-expandable').forEach(function(row) {
+    var jobId = row.getAttribute('data-job-id');
+    var children = document.querySelectorAll('[data-parent-id="' + jobId + '"]');
+
+    function setCollapsed(collapsed) {
+      if (collapsed) {
+        row.classList.add('at-collapsed');
+        children.forEach(function(c) { c.classList.add('at-hidden'); });
+      } else {
+        row.classList.remove('at-collapsed');
+        children.forEach(function(c) { c.classList.remove('at-hidden'); });
+      }
+    }
+
+    // Default: expanded (show children)
+    setCollapsed(jobState[jobId] || false);
+
+    row.addEventListener('click', function() {
+      var isCollapsed = !row.classList.contains('at-collapsed');
+      jobState[jobId] = isCollapsed;
+      saveJobState();
+      setCollapsed(isCollapsed);
+    });
+  });
+})();
+</script>
+
+{% endblock %}

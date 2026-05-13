@@ -1,0 +1,572 @@
+{% extends "base.html" %}
+{% block title %}Morning Briefing — PM Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Morning Briefing</h2>
+    <p class="page-subtitle">{{ briefing.date }}</p>
+  </div>
+</div>
+
+{# ---- Sortable Panels ---- #}
+<div class="sortable-panels">
+
+{# ---- Time Balance + What Changed (side by side) ---- #}
+<div class="detail-grid">
+  {% if briefing.time_bars %}
+  <section class="section-card collapsible-section" data-collapse-id="briefing-time-balance" data-panel-id="briefing-time-balance">
+    <div class="section-header collapsible-toggle">
+      <h3>Time Balance</h3>
+      <span class="section-meta">Full team &middot; Last 5 working days</span>
+      <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="time-chart time-chart-large">
+      {% set total_hours = briefing.time_bars | map(attribute='hours') | sum %}
+      {% for bar in briefing.time_bars | sort(attribute='hours', reverse=true) %}
+      <div class="time-row">
+        <span class="time-label">{{ bar.name }}</span>
+        <div class="time-bar-track">
+          <div class="time-bar-fill" style="width: {{ bar.pct }}%; background: {{ bar.color }};"></div>
+        </div>
+        <span class="time-hours">{{ bar.hours }}h</span>
+        <span class="time-pct">{{ ((bar.hours / total_hours) * 100) | round | int }}%</span>
+      </div>
+      {% endfor %}
+      <div class="time-total">
+        <span class="time-label"><strong>Total</strong></span>
+        <span class="time-hours"><strong>{{ total_hours | round(1) }}h</strong></span>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if briefing.changes %}
+  <section class="section-card collapsible-section" data-collapse-id="briefing-changes" data-panel-id="briefing-changes">
+    <div class="section-header collapsible-toggle">
+      <h3>What Changed Overnight</h3>
+      <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="changelog">
+      {% for change in briefing.changes %}
+      <div class="changelog-item">
+        <div class="changelog-dot" style="background: {{ dashboard.details.get(change.project, {}).get('color', '#64748b') }};"></div>
+        <div class="changelog-content">
+          <strong>{{ change.project }}</strong>
+          <span>{{ change.text | safe }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if yesterday_time and yesterday_time.projects %}
+    <div class="yesterday-time">
+      <div class="yesterday-time-header">
+        <h4>Time Logged &middot; {{ yesterday_time.date }}</h4>
+        {% set grand_total = yesterday_time.projects | map(attribute='total_hours') | sum %}
+        <span class="yesterday-time-total">{{ grand_total | round(1) }}h team total</span>
+      </div>
+      <div class="yt-chart">
+        {% for proj in yesterday_time.projects %}
+        <div class="yt-row">
+          <span class="yt-label">{{ proj.project }}</span>
+          <div class="yt-bar-track">
+            {% for person in proj.people %}
+            <div class="yt-bar-seg" style="width: {{ person.pct }}%; background: {{ person.color }};" data-tip="{{ person.name }} — {{ person.hours }}h"></div>
+            {% endfor %}
+          </div>
+          <span class="yt-hours">{{ proj.total_hours }}h</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="yt-legend">
+        {% set seen = [] %}
+        {% for proj in yesterday_time.projects %}
+        {% for person in proj.people %}
+        {% if person.full_name not in seen %}
+        <span class="yt-legend-item"><span class="yt-legend-dot" style="background: {{ person.color }};"></span>{{ person.name }}</span>
+        {% if seen.append(person.full_name) %}{% endif %}
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+
+{# ---- Needs Attention + Stale PRs (side by side) ---- #}
+<div class="detail-grid">
+  {% if briefing.attention %}
+  <section class="section-card section-attention collapsible-section" data-collapse-id="briefing-attention" data-panel-id="briefing-attention">
+    <div class="section-header collapsible-toggle">
+      <h3>Needs Attention Today</h3>
+      <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="attention-list">
+      {% for item in briefing.attention %}
+      <div class="attention-item">
+        <span class="attention-dot" style="background: {{ dashboard.details.get(item.project, {}).get('color', '#64748b') }};"></span>
+        <div>
+          <strong>{{ item.project }}</strong>
+          <span class="attention-text">{{ item.text | safe }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if staleness.stale_items %}
+  <section class="section-card section-stale collapsible-section" data-collapse-id="briefing-stale" data-panel-id="briefing-stale">
+    <div class="section-header collapsible-toggle">
+      <h3>Stale PRs</h3>
+      <span class="section-meta">{{ staleness.stale_items | length }} need attention</span>
+      <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    {# Visual bar chart of idle days #}
+    {% set max_idle = staleness.stale_items | map(attribute='idle_days') | max %}
+    <div class="stale-chart">
+      {% for item in staleness.stale_items %}
+      <div class="stale-bar-row" data-tip="#{{ item.number }} {{ item.title }}&#10;{{ item.author }} · {{ item.reason }}">
+        <span class="stale-bar-label">
+          <span class="stale-project-dot" style="background: {{ dashboard.details.get(item.project, {}).get('color', '#64748b') }};"></span>
+          <a href="https://github.com/{{ item.repo }}/pull/{{ item.number }}" target="_blank" rel="noopener">#{{ item.number }}</a>
+        </span>
+        <div class="stale-bar-track">
+          <div class="stale-bar-fill stale-bar-{{ item.staleness }}" style="width: {{ (item.idle_days / max_idle * 100) | round }}%;"></div>
+        </div>
+        <span class="stale-bar-days">{{ item.idle_days }}d</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="stale-list">
+      {% for item in staleness.stale_items %}
+      <div class="stale-item stale-{{ item.staleness }}">
+        <div class="stale-item-header">
+          <span class="stale-project-dot" style="background: {{ dashboard.details.get(item.project, {}).get('color', '#64748b') }};"></span>
+          <a href="https://github.com/{{ item.repo }}/pull/{{ item.number }}" target="_blank" rel="noopener"><strong>{{ item.project }} #{{ item.number }}</strong></a>
+          <span class="stale-age">{{ item.idle_days }}d idle</span>
+        </div>
+        <p class="stale-title"><a href="https://github.com/{{ item.repo }}/pull/{{ item.number }}" target="_blank" rel="noopener">{{ item.title }}</a></p>
+        <div class="stale-meta">
+          <span>{{ item.author }}</span>
+          {% if item.reason %}
+          <span class="stale-reason stale-reason-{{ item.staleness }}">{{ item.reason }}</span>
+          {% endif %}
+          {% if item.is_draft %}<span class="stale-draft">Draft</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+{# ---- Open Questions (full width) ---- #}
+{% if briefing.questions %}
+<section class="section-card collapsible-section" data-collapse-id="briefing-questions" data-panel-id="briefing-questions">
+  <div class="section-header collapsible-toggle">
+    <h3>Open Questions</h3>
+    <span class="section-meta">{{ briefing.questions | length }} pending</span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="questions-list">
+    {% for q in briefing.questions %}
+    <div class="question-item">
+      <div class="question-label">{{ q.label }}</div>
+      <p class="question-text">{{ q.text }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ---- Self-Improvement (full width) ---- #}
+{% if briefing.self_improvement %}
+<section class="section-card collapsible-section" data-collapse-id="briefing-self-improvement" data-panel-id="briefing-self-improvement">
+  <div class="section-header collapsible-toggle">
+    <h3>Self-Improvement</h3>
+    <span class="section-meta">Retrospector summary</span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="self-improvement-content" style="padding: 1rem;">
+    <p style="margin: 0; font-size: 0.85rem; line-height: 1.6; color: var(--on-surface);">{{ briefing.self_improvement }}</p>
+  </div>
+</section>
+{% endif %}
+
+{# ---- Daily Standup (Geekbot) — collapsible ---- #}
+{% if geekbot.raw %}
+<div class="section-card collapsible-section collapsed" data-collapse-id="briefing-geekbot" data-panel-id="briefing-geekbot">
+  <div class="section-header collapsible-toggle">
+    <h3>Daily Standup (Geekbot)</h3>
+    <span class="section-meta">{{ geekbot.date }}</span>
+    <div class="report-actions-inline" onclick="event.stopPropagation()">
+      <button class="btn btn-secondary btn-sm" onclick="toggleEdit('geekbot')" id="geekbot-edit-btn">Edit</button>
+      <button class="btn btn-secondary btn-sm" onclick="copyReport('geekbot')">Copy</button>
+      <button class="btn btn-secondary btn-sm" onclick="saveReport('geekbot')" id="geekbot-save-btn" style="display:none;">Save</button>
+      <span class="report-toast" id="geekbot-toast"></span>
+    </div>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <pre class="report-content" id="geekbot-content">{{ geekbot.raw }}</pre>
+</div>
+{% endif %}
+
+{# ---- Weekly PM Update — collapsible ---- #}
+{% if weekly.raw %}
+<div class="section-card collapsible-section collapsed" data-collapse-id="briefing-weekly" data-panel-id="briefing-weekly">
+  <div class="section-header collapsible-toggle">
+    <h3>Weekly PM Update</h3>
+    <span class="section-meta">{{ weekly.date }}</span>
+    <div class="report-actions-inline" onclick="event.stopPropagation()">
+      <button class="btn btn-secondary btn-sm" onclick="toggleEdit('weekly')" id="weekly-edit-btn">Edit</button>
+      <button class="btn btn-secondary btn-sm" onclick="copyReport('weekly')">Copy</button>
+      <button class="btn btn-secondary btn-sm" onclick="saveReport('weekly')" id="weekly-save-btn" style="display:none;">Save</button>
+      <span class="report-toast" id="weekly-toast"></span>
+    </div>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <pre class="report-content" id="weekly-content">{{ weekly.raw }}</pre>
+</div>
+{% endif %}
+
+</div>{# end .sortable-panels #}
+
+{# ---- Collapsible + Report Interaction Scripts ---- #}
+<style>
+.collapsible-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.collapsible-toggle .section-meta {
+  margin-left: auto;
+}
+.collapse-chevron {
+  margin-left: 0.75rem;
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.collapsible-toggle:hover .collapse-chevron {
+  opacity: 1;
+}
+.collapsible-section.collapsed .collapse-chevron {
+  transform: rotate(-90deg);
+}
+.collapsible-section.collapsed > *:not(.section-header) {
+  display: none;
+}
+/* Stale PR bar chart */
+.stale-chart {
+  padding: 0.5rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--outline-variant);
+}
+.stale-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+}
+.stale-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 3.5rem;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+.stale-bar-label a {
+  color: var(--on-surface);
+  text-decoration: none;
+}
+.stale-bar-label a:hover { text-decoration: underline; }
+.stale-bar-track {
+  flex: 1;
+  height: 14px;
+  background: var(--surface-container);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.stale-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.stale-bar-warning { background: var(--warning, #f59e0b); opacity: 0.7; }
+.stale-bar-critical { background: var(--error, #f44336); opacity: 0.8; }
+.stale-bar-fresh { background: var(--success, #10b981); opacity: 0.5; }
+.stale-bar-days {
+  width: 2rem;
+  text-align: right;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  flex-shrink: 0;
+}
+
+/* Yesterday's time logged chart */
+.yesterday-time {
+  border-top: 1px solid var(--outline-variant);
+  padding: 0.75rem 1rem 0.5rem;
+}
+.yesterday-time-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.yesterday-time-header h4 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.yesterday-time-total {
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  font-weight: 500;
+}
+.yt-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.yt-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 36px;
+  align-items: center;
+  gap: 0.5rem;
+}
+.yt-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--on-surface);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.yt-bar-track {
+  display: flex;
+  height: 16px;
+  background: var(--surface-container-high);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.yt-bar-seg {
+  height: 100%;
+  transition: width 0.5s ease;
+  min-width: 3px;
+  cursor: default;
+  position: relative;
+}
+.yt-bar-seg:first-child { border-radius: 4px 0 0 4px; }
+.yt-bar-seg:last-child { border-radius: 0 4px 4px 0; }
+.yt-bar-seg:only-child { border-radius: 4px; }
+.yt-hours {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--on-surface);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.yt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--outline-variant);
+}
+.yt-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  color: var(--on-surface-variant);
+}
+.yt-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+
+.report-content {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--on-surface);
+  margin: 0;
+  padding: 1rem;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.report-content.editing {
+  border-color: var(--primary);
+  background: var(--surface-container-low);
+  outline: none;
+  cursor: text;
+}
+.report-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+.btn {
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+.btn-secondary {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+}
+.btn-secondary:hover {
+  background: var(--outline-variant);
+}
+.btn-sm {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.btn-primary:hover {
+  opacity: 0.9;
+}
+.report-toast {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--success, #10b981);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.report-toast.show {
+  opacity: 1;
+}
+</style>
+
+<script>
+(function() {
+  // Collapsible sections
+  var STORAGE_KEY = 'briefing-collapsed-sections';
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  var state = loadState();
+  document.querySelectorAll('.collapsible-section').forEach(function(section) {
+    var id = section.getAttribute('data-collapse-id');
+    var toggle = section.querySelector('.collapsible-toggle');
+    if (!id || !toggle) return;
+    if (state[id] === undefined || state[id]) {
+      section.classList.add('collapsed');
+    } else {
+      section.classList.remove('collapsed');
+    }
+    toggle.addEventListener('click', function() {
+      var isCollapsed = section.classList.toggle('collapsed');
+      state[id] = isCollapsed;
+      saveState(state);
+    });
+  });
+})();
+
+function showToast(id, msg) {
+  var el = document.getElementById(id + '-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(function() { el.classList.remove('show'); }, 2500);
+}
+
+function toggleEdit(id) {
+  var el = document.getElementById(id + '-content');
+  var editBtn = document.getElementById(id + '-edit-btn');
+  var saveBtn = document.getElementById(id + '-save-btn');
+  var isEditing = el.isContentEditable;
+
+  if (isEditing) {
+    el.contentEditable = 'false';
+    el.classList.remove('editing');
+    editBtn.textContent = 'Edit';
+    saveBtn.style.display = 'none';
+  } else {
+    el.contentEditable = 'plaintext-only';
+    el.classList.add('editing');
+    el.focus();
+    editBtn.textContent = 'Cancel';
+    saveBtn.style.display = '';
+  }
+}
+
+function copyReport(id) {
+  var el = document.getElementById(id + '-content');
+  navigator.clipboard.writeText(el.innerText).then(function() {
+    showToast(id, 'Copied!');
+  });
+}
+
+function saveReport(id) {
+  var el = document.getElementById(id + '-content');
+  var url = '/api/' + id + '/save';
+  var dateEl = document.querySelector('[data-collapse-id="briefing-' + id + '"] .section-meta');
+  var date = dateEl ? dateEl.textContent.trim() : '';
+  var headerMap = { geekbot: 'Geekbot Standup', weekly: 'Weekly PM Update' };
+  var header = '# ' + headerMap[id] + ' \u2014 ' + date + '\n\n';
+  var content = header + el.innerText;
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: content }),
+  }).then(function(resp) {
+    if (resp.ok) {
+      showToast(id, 'Saved!');
+      toggleEdit(id);
+    } else {
+      showToast(id, 'Save failed');
+    }
+  });
+}
+
+</script>
+
+{% endblock %}

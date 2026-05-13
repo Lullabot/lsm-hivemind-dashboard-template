@@ -1,0 +1,49 @@
+# Top-level dashboard settings. Edit to taste after forking.
+
+# Title shown in the browser tab + sidebar.
+title: PM Dashboard
+
+# Your name (or aliases) used by the "is this my action item" filter on the
+# global Tasks panel. Leave empty to show every action item from every project.
+# Names are matched case-insensitively against the "owner" field of meeting
+# action items.
+owner_aliases:
+  - "Your Name"
+
+# Path overrides. All paths are resolved relative to the repo root unless
+# absolute. Override via env vars HIVEMIND_MEMORY_BANK / HIVEMIND_AGENTS_DIR
+# if you keep your memory bank somewhere else.
+paths:
+  memory_bank: memory-bank
+  agents: agents
+
+# Project status string -> CSS class. Add more rows as your team's vocabulary
+# evolves.
+status_map:
+  on track: on-track
+  at risk: at-risk
+  stable: stable
+  active: active
+  active development: active
+  blocked: at-risk
+
+# PR staleness thresholds in days.
+staleness:
+  warn_days: 3
+  crit_days: 7
+
+# Person color palette (assigned in the order people appear in Noko data).
+person_colors:
+  - "#818cf8"  # indigo
+  - "#f472b6"  # pink
+  - "#34d399"  # emerald
+  - "#fbbf24"  # amber
+  - "#60a5fa"  # blue
+  - "#a78bfa"  # violet
+  - "#f87171"  # red
+  - "#2dd4bf"  # teal
+  - "#fb923c"  # orange
+  - "#c084fc"  # purple
+
+# Person display-name normalization. "Full Name" -> "Short".
+person_aliases: {}
