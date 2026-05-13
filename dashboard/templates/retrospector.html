@@ -9,6 +9,24 @@
   </div>
 </div>
 
+{% if not retrospector.improvements %}
+{% set hint_id = "retro-empty" %}
+{% set hint_title = "No improvements detected yet" %}
+{% set hint_body %}<p>The retrospector analyzes your Claude Code session logs and surfaces repeat patterns (failed commands, tool misuse, repeated bugs). It only produces output once it has a few days of sessions to learn from.</p><p>If you don't run Claude Code, this page will stay empty — that's fine, it's an opt-in feature.</p>{% endset %}
+{% set hint_prompt %}Set up the nightly retrospector for me.
+
+Write a shell script at scripts/retrospector.sh that:
+1. Globs ~/.claude/projects/*/sessions/*.jsonl for sessions from the last 24 hours.
+2. Extracts each turn's tool calls + results.
+3. Pipes the corpus into Claude (or whichever LLM CLI I have) with a prompt asking it to identify repeat failures and propose memory/CLAUDE.md edits.
+4. Writes the structured response to memory-bank/retrospector-report.md and memory-bank/retrospector-report-details.json. The shape is parsed by parse_retrospector() in dashboard/data.py — match its expectations.
+5. Add a launchd-plist example in docs/SETUP.md for running it nightly at 11:59pm.
+
+Keep it idempotent: re-running on the same day should overwrite, not append.{% endset %}
+{% set hint_doc = "memory-bank/retrospector-report.md" %}
+{% include "_empty_hint.html" %}
+{% endif %}
+
 {# ---- Date Navigation ---- #}
 {% if retrospector_dates is defined and retrospector_dates %}
 <style>

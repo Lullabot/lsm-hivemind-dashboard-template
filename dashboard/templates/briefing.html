@@ -9,6 +9,23 @@
   </div>
 </div>
 
+{% if is_example_config %}
+{% set hint_id = "briefing-seeded" %}
+{% set hint_title = "This briefing is example content" %}
+{% set hint_body %}<p>The dashboard reads <code>memory-bank/morning-briefing.md</code>. The version you're seeing was seeded from the template — replace it (or wire an agent to overwrite it daily) to get a real morning summary.</p>{% endset %}
+{% set hint_prompt %}Set up a daily morning briefing for me.
+
+Write a shell script at scripts/morning-briefing.sh that:
+1. For each project in config/projects.yml, calls `gh pr list --repo <github> --json number,title,updatedAt,reviewDecision,author` and collects yesterday's commits.
+2. Pipes a structured summary into Claude (use the `claude` CLI in non-interactive mode, or whichever LLM CLI I have installed) with a prompt asking for: "what changed overnight" (bullet list), "where to focus today" (bullet list), and "open questions" (project + question).
+3. Writes the LLM output to memory-bank/morning-briefing.md, matching the existing format (see the current file for shape; the parser is parse_briefing() in dashboard/data.py).
+4. Add launchd-plist instructions in docs/SETUP.md for running it daily at 6am.
+
+Use the user's `gh` CLI for GitHub auth — don't add new dependencies.{% endset %}
+{% set hint_doc = "memory-bank/morning-briefing.md" %}
+{% include "_empty_hint.html" %}
+{% endif %}
+
 {# ---- Sortable Panels ---- #}
 <div class="sortable-panels">
 

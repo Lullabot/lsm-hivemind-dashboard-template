@@ -294,5 +294,51 @@
     });
   })();
   </script>
+
+  <script>
+  // Inline hint helpers: copy-to-clipboard + dismiss-with-localStorage.
+  (function() {
+    var DISMISSED_KEY = 'pmdashboard-hints-dismissed';
+    function dismissedSet() {
+      try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')); }
+      catch (e) { return new Set(); }
+    }
+    function saveDismissed(set) {
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(set)));
+    }
+    // Hide previously dismissed hints on load.
+    var dismissed = dismissedSet();
+    document.querySelectorAll('.empty-hint[data-hint-id]').forEach(function(el) {
+      if (dismissed.has(el.dataset.hintId)) el.remove();
+    });
+    // Wire copy buttons.
+    document.querySelectorAll('.empty-hint-copy').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var target = document.getElementById(btn.dataset.copyTarget);
+        if (!target) return;
+        navigator.clipboard.writeText(target.innerText).then(function() {
+          var prev = btn.textContent;
+          btn.textContent = 'Copied!';
+          btn.classList.add('empty-hint-copy-success');
+          setTimeout(function() {
+            btn.textContent = prev;
+            btn.classList.remove('empty-hint-copy-success');
+          }, 1500);
+        });
+      });
+    });
+    // Wire dismiss buttons.
+    document.querySelectorAll('[data-hint-dismiss]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var id = btn.dataset.hintDismiss;
+        var set = dismissedSet();
+        set.add(id);
+        saveDismissed(set);
+        var card = btn.closest('.empty-hint');
+        if (card) card.remove();
+      });
+    });
+  })();
+  </script>
 </body>
 </html>

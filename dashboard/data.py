@@ -27,6 +27,15 @@ PROJECT_GITHUB_REPOS = _CFG["project_github"]
 CLIENT_PROJECTS = _CFG["client_projects"]
 DEFAULT_COLOR = "#64748b"
 
+# Names that ship with the template. If the live config still uses these,
+# the dashboard is running on example data and onboarding hints should fire.
+EXAMPLE_PROJECT_NAMES = {"ProjectAlpha", "ProjectBeta", "Internal"}
+
+
+def is_example_config():
+    """True when the active config still matches the shipped template."""
+    return set(_CFG["project_names"]) == EXAMPLE_PROJECT_NAMES
+
 
 def md_links_to_html(text):
     """Convert markdown links [text](url) to HTML <a> tags."""
@@ -1580,6 +1589,7 @@ def get_all_data():
         "automations": get_automations(),
         "run_history": parse_run_history(),
         "health": get_health(),
+        "is_example_config": is_example_config(),
         "stats": {
             "total_projects": total_projects,
             "at_risk": at_risk,

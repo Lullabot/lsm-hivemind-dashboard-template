@@ -9,6 +9,25 @@
   </div>
 </div>
 
+{% if not people %}
+{% set hint_id = "people-empty" %}
+{% set hint_title = "No team activity data yet" %}
+{% set hint_body %}<p>This page reads Noko time-entry JSON files from <code>agents/&lt;Project&gt;/logs/*.json</code>. There are none yet, so the team-activity charts can't render.</p><p>If you don't use Noko, you can produce the same JSON shape from any time-tracking tool. Each entry needs <code>date</code>, <code>user.first_name</code>, <code>user.last_name</code>, <code>minutes</code>, and <code>tags</code>.</p>{% endset %}
+{% set hint_prompt %}Wire up Noko time-entry fetching for my dashboard.
+
+Write a shell script at scripts/fetch-noko.sh that:
+1. Reads NOKO_TOKEN from a .env file at the repo root.
+2. For each project listed in config/projects.yml, calls the Noko v2 API entries endpoint, scoping by `project_ids` (I'll add a `noko_project_id` field to each project entry — please add that field to the YAML schema).
+3. Writes the resulting JSON array to agents/<ProjectName>/logs/YYYY-MM-DD.json, using today's date.
+4. Limits to the last 30 days.
+
+Then add a launchd plist or a cron line in docs/SETUP.md showing how to run it daily.
+
+Reference the existing parse_noko_entries() in dashboard/data.py for the expected JSON shape (each entry needs user.first_name, user.last_name, date, minutes, tags[].formatted_name, billable).{% endset %}
+{% set hint_doc = "docs/INTEGRATIONS.md (Noko time entries)" %}
+{% include "_empty_hint.html" %}
+{% endif %}
+
 {# ---- Summary Stats ---- #}
 {% set total_team_hours = people | map(attribute='total_hours') | sum %}
 <div class="stats-row">
