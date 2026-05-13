@@ -1,0 +1,1141 @@
+{% extends "base.html" %}
+{% block title %}Retrospector — PM Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Retrospector</h2>
+    <p class="page-subtitle" data-tip="{{ retrospector.report_path }}">Nightly self-improvement report &mdash; {{ retrospector.date }}</p>
+  </div>
+</div>
+
+{# ---- Date Navigation ---- #}
+{% if retrospector_dates is defined and retrospector_dates %}
+<style>
+.retro-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface-container-high);
+  color: var(--on-surface-variant);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: default;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+  border: 1px solid var(--outline-variant);
+}
+.retro-help:hover {
+  background: var(--outline-variant);
+  color: var(--on-surface);
+}
+/* Distribution summary bars */
+.retro-dist-bar {
+  display: flex;
+  height: 24px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 0.75rem 1rem;
+  background: var(--surface-container);
+}
+.retro-dist-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  transition: width 0.3s ease;
+}
+.retro-dist-seg span {
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 0.4rem;
+}
+.retro-dist-high { background: var(--success-muted); color: var(--success-text); }
+.retro-dist-med { background: var(--warning-muted); color: var(--warning-text); }
+.retro-dist-low { background: var(--surface-container-high); color: var(--on-surface-variant); }
+.retro-dist-effective { background: var(--success-muted); color: var(--success-text); }
+.retro-dist-pending { background: var(--warning-muted); color: var(--warning-text); }
+.retro-dist-ineffective { background: var(--error-muted, rgba(244,67,54,0.15)); color: var(--error, #f44336); }
+
+/* Failure trend sparkline */
+.retro-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 28px;
+  margin-top: 0.4rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--outline-variant);
+}
+.retro-spark-bar {
+  flex: 1;
+  min-width: 4px;
+  max-width: 16px;
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.3s ease;
+}
+
+.retro-date-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.retro-date-nav::-webkit-scrollbar {
+  height: 4px;
+}
+.retro-date-nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+}
+.retro-date-nav-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255,255,255,0.45);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.retro-date-pill {
+  display: inline-block;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.retro-date-pill:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
+}
+.retro-date-select {
+  padding: 0.3rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 1.2rem;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(255,255,255,0.4)' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.4rem center;
+}
+.retro-date-select:hover {
+  background-color: rgba(255,255,255,0.12);
+}
+.retro-date-select option {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+}
+.retro-date-pill.active {
+  background: rgba(168,85,247,0.25);
+  color: #c084fc;
+  border-color: rgba(168,85,247,0.4);
+}
+.retro-change-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.retro-change-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.retro-change-patched { background: #dbeafe; color: #1e40af; }
+.retro-change-created { background: #dcfce7; color: #166534; }
+.retro-change-updated { background: #fef3c7; color: #92400e; }
+.retro-change-nochange { background: var(--surface-container); color: var(--on-surface-variant); }
+.retro-change-notfound { background: #fee2e2; color: #991b1b; }
+.retro-change-note { font-size: 0.8rem; color: var(--on-surface-variant); }
+
+/* Escalation callout */
+.retro-escalation-callout {
+  margin: 0.75rem 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: rgba(244, 67, 54, 0.08);
+  border: 1px solid rgba(244, 67, 54, 0.25);
+}
+.retro-escalation-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #f44336;
+  margin-bottom: 0.75rem;
+}
+.retro-escalation-subtitle {
+  font-size: 0.8rem;
+  color: var(--on-surface-variant);
+  font-weight: 400;
+}
+.retro-escalation-item {
+  padding: 0.5rem 0;
+  border-top: 1px solid rgba(244, 67, 54, 0.1);
+}
+.retro-escalation-item:first-child {
+  border-top: none;
+}
+.retro-escalation-target {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.retro-escalation-target code {
+  font-size: 0.85rem;
+  color: var(--on-surface);
+}
+.retro-escalation-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.15);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+.retro-escalation-rec {
+  font-size: 0.8rem;
+  color: var(--on-surface-variant);
+  line-height: 1.5;
+  padding-left: 0.25rem;
+}
+.retro-diff {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* Group tabs */
+.retro-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0.5rem 0 1.25rem;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--outline-variant);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.retro-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--on-surface-variant);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.55rem 0.9rem;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+}
+.retro-tab:hover {
+  color: var(--on-surface);
+  background: rgba(255,255,255,0.04);
+}
+.retro-tab.active {
+  color: #c084fc;
+  border-bottom-color: #c084fc;
+}
+.retro-tab-panel[hidden] {
+  display: none;
+}
+</style>
+<nav class="retro-date-nav">
+  <span class="retro-date-nav-label">History</span>
+  {% for d in retrospector_dates[:10] %}
+  <a href="/retrospector/{{ d }}" class="retro-date-pill{% if (current_date == d) or (current_date is none and loop.first) %} active{% endif %}">{{ d }}</a>
+  {% endfor %}
+  {% if retrospector_dates | length > 10 %}
+  <select class="retro-date-select" onchange="if(this.value) window.location.href='/retrospector/'+this.value">
+    <option value="">Older...</option>
+    {% for d in retrospector_dates[10:] %}
+    <option value="{{ d }}" {% if current_date == d %}selected{% endif %}>{{ d }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+</nav>
+{% endif %}
+
+<nav class="retro-tabs" role="tablist">
+  <button type="button" class="retro-tab" data-tab="this-run" data-tip="Today's analysis: stats, proposed improvements, and meta-reflection">This run</button>
+  <button type="button" class="retro-tab" data-tab="effectiveness" data-tip="Did past improvements stick? — verdicts and recurrence tracking">Effectiveness</button>
+  <button type="button" class="retro-tab" data-tab="promotions" data-tip="When memory wasn't enough — CLAUDE.md escalations and hook enforcements">Promotions</button>
+  <button type="button" class="retro-tab" data-tab="hygiene" data-tip="Memory hygiene — weekly consolidation history">Hygiene</button>
+</nav>
+
+<div class="sortable-panels retro-tab-panel" data-sort-key="this-run" data-tab-id="this-run">
+{# ---- Stats Row ---- #}
+<div class="stats-row" data-panel-id="retro-stats" style="grid-template-columns: repeat(4, 1fr);">
+  <div class="stat-card">
+    <div class="stat-label">Sessions Analyzed</div>
+    <div class="stat-value-row">
+      <span class="stat-value" style="font-size: 1.25rem;">{{ retrospector.sessions or 'N/A' }}</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Failures Detected</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ retrospector.failures }}</span>
+      {% if retrospector.failures > 20 %}
+      <span class="stat-badge badge-warning">HIGH</span>
+      {% elif retrospector.failures > 0 %}
+      <span class="stat-badge badge-info">ACTIVE</span>
+      {% else %}
+      <span class="stat-badge badge-success">CLEAN</span>
+      {% endif %}
+    </div>
+    {% if retro_trend and retro_trend | length > 1 %}
+    <div class="retro-sparkline" data-tip="Failure trend ({{ retro_trend | length }} days){% for pt in retro_trend %}&#10;{{ pt.date }}: {{ pt.failures }}{% endfor %}">
+      {% set max_fail = retro_trend | map(attribute='failures') | max %}
+      {% for pt in retro_trend %}
+      <div class="retro-spark-bar" style="height: {{ (pt.failures / max_fail * 100) | round if max_fail else 0 }}%; background: {% if pt.failures > 30 %}var(--error, #f44336){% elif pt.failures > 15 %}var(--warning, #f59e0b){% else %}var(--success, #10b981){% endif %};"></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Improvements Proposed</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ retrospector.improvements | length }}</span>
+      {% if retrospector.branch %}
+      <span class="stat-badge badge-accent">{{ retrospector.branch | replace('self-improvement/', '') }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% if health is defined and health.sources.memory_index is defined %}
+  {% set mem = health.sources.memory_index %}
+  <div class="stat-card" data-tip="{{ mem.path }}">
+    <div class="stat-label">Memory Index</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ mem.compact_age }}</span>
+      {% if mem.status == 'error' %}
+      <span class="stat-badge badge-warning">FULL</span>
+      {% elif mem.status == 'warning' %}
+      <span class="stat-badge badge-warning">HIGH</span>
+      {% else %}
+      <span class="stat-badge badge-success">OK</span>
+      {% endif %}
+    </div>
+    <div style="font-size: 0.75rem; color: var(--on-surface-variant); margin-top: 0.25rem;">
+      {{ mem.line_count }}/{{ mem.line_limit }} lines &middot; {{ mem.size_kb }}KB/{{ mem.size_limit_kb }}KB
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ---- Improvements Table ---- #}
+{% if retrospector.improvements %}
+<section class="section-card collapsible-section" data-collapse-id="retro-improvements" data-panel-id="retro-improvements">
+  <div class="section-header collapsible-toggle">
+    <h3>Proposed Improvements</h3>
+    <span class="section-meta">{{ retrospector.improvements | length }} items &middot; click row to expand</span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  {# Confidence distribution bar #}
+  {% set conf_high = retrospector.improvements | selectattr('confidence', 'equalto', 'high') | list | length %}
+  {% set conf_med = retrospector.improvements | selectattr('confidence', 'equalto', 'medium') | list | length %}
+  {% set conf_low = retrospector.improvements | length - conf_high - conf_med %}
+  {% set conf_total = retrospector.improvements | length %}
+  <div class="retro-dist-bar" data-tip="high: {{ conf_high }} / medium: {{ conf_med }} / low: {{ conf_low }}">
+    {% if conf_high %}<div class="retro-dist-seg retro-dist-high" style="width: {{ (conf_high / conf_total * 100) | round }}%"><span>{{ conf_high }} high</span></div>{% endif %}
+    {% if conf_med %}<div class="retro-dist-seg retro-dist-med" style="width: {{ (conf_med / conf_total * 100) | round }}%"><span>{{ conf_med }} med</span></div>{% endif %}
+    {% if conf_low > 0 %}<div class="retro-dist-seg retro-dist-low" style="width: {{ (conf_low / conf_total * 100) | round }}%"><span>{{ conf_low }} low</span></div>{% endif %}
+  </div>
+
+  <div class="retro-table-wrap">
+    <table class="alloc-table retro-table retro-table-expandable">
+      <thead>
+        <tr>
+          <th style="width: 2rem; text-align: center;">#</th>
+          <th style="width: 8rem;">Category</th>
+          <th style="width: 5rem;">Agent</th>
+          <th>Target</th>
+          <th style="width: 5rem;">Confidence</th>
+          <th>Description</th>
+          <th style="width: 1.5rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in retrospector.improvements %}
+        <tr class="retro-row" data-target="{{ item.target }}">
+          <td style="text-align: center;">{{ item.number }}</td>
+          <td>
+            <span class="retro-category retro-cat-{{ item.category }}">{{ item.category | replace('_', ' ') }}</span>
+          </td>
+          <td>
+            <span class="retro-agent retro-agent-{{ item.source_agent | lower }}">{{ item.source_agent }}</span>
+          </td>
+          <td class="retro-target" data-tip="{{ item.target_path }}">{{ item.target | replace('memory/', '') }}</td>
+          <td>
+            <span class="retro-confidence retro-conf-{{ item.confidence }}">{{ item.confidence }}</span>
+          </td>
+          <td class="retro-desc">{{ item.description }}</td>
+          <td>
+            <svg class="retro-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </td>
+        </tr>
+        <tr class="retro-detail-row" hidden>
+          <td colspan="7" class="retro-detail-cell">
+            <div class="retro-item-target-label">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M2 4.5C2 3.12 3.12 2 4.5 2h4.59a1.5 1.5 0 011.06.44l3.41 3.41a1.5 1.5 0 01.44 1.06V11.5A2.5 2.5 0 0111.5 14h-7A2.5 2.5 0 012 11.5v-7z" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M5 8h6M5 10.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+              <span data-tip="{{ item.target_path }}">{{ item.target }}</span>
+            </div>
+            {% if item.proposed_change %}
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">Proposed Change</div>
+              <pre class="retro-file-content">{{ item.proposed_change }}</pre>
+            </div>
+            {% endif %}
+            {% if item.reasoning %}
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">Reasoning</div>
+              <p class="retro-detail-text">{{ item.reasoning }}</p>
+            </div>
+            {% endif %}
+            {% if item.change_made %}
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">Change Made</div>
+              {% if item.change_made.action == "patched" and item.change_made.diff %}
+              <div class="retro-change-info">
+                <span class="retro-change-badge retro-change-patched">Patched</span>
+                <code>{{ item.change_made.file }}</code>
+              </div>
+              <pre class="retro-file-content retro-diff">{{ item.change_made.diff }}</pre>
+              {% elif item.change_made.action == "created" %}
+              <div class="retro-change-info">
+                <span class="retro-change-badge retro-change-created">Created</span>
+                <code>{{ item.change_made.file }}</code>
+              </div>
+              {% elif item.change_made.action == "updated" %}
+              <div class="retro-change-info">
+                <span class="retro-change-badge retro-change-updated">Updated</span>
+                <code>{{ item.change_made.file }}</code>
+              </div>
+              {% elif item.change_made.action == "no_change" %}
+              <div class="retro-change-info">
+                <span class="retro-change-badge retro-change-nochange">No Change</span>
+                <code>{{ item.change_made.file }}</code>
+                <span class="retro-change-note">Fix had no effect</span>
+              </div>
+              {% elif item.change_made.action == "file_not_found" %}
+              <div class="retro-change-info">
+                <span class="retro-change-badge retro-change-notfound">Not Found</span>
+                <code>{{ item.change_made.file }}</code>
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if not item.proposed_change and not item.reasoning %}
+            <div class="retro-item-content" data-target="{{ item.target }}">
+              <span class="retro-no-details">Detail data not available for this run. The next retrospector run will save full proposed changes and reasoning. If the memory file already exists, its contents will load below.</span>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{# ---- Meta-Improvement (full width) ---- #}
+<section class="section-card collapsible-section" data-collapse-id="retro-meta" data-panel-id="retro-meta">
+  <div class="section-header collapsible-toggle">
+    <h3>Meta-Improvement</h3>
+    <span class="section-meta">Self-analysis</span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="retro-meta">
+    {% if retrospector.meta %}
+    <p>{{ retrospector.meta }}</p>
+    {% else %}
+    <p class="retro-empty-text">No meta-improvement notes for this run.</p>
+    {% endif %}
+  </div>
+</section>
+
+</div>{# end .sortable-panels (this-run) #}
+
+<div class="sortable-panels retro-tab-panel" data-sort-key="effectiveness" data-tab-id="effectiveness" hidden>
+
+{# ---- Effectiveness Tracking (full width) ---- #}
+<section class="section-card collapsible-section" data-collapse-id="retro-effectiveness" data-panel-id="retro-effectiveness">
+    <div class="section-header collapsible-toggle">
+      <h3>Effectiveness Tracking
+        <span class="retro-help" data-tip="Tracks whether past improvements actually reduce errors.&#10;&#10;Status: applied (on review branch) or merged (in main).&#10;Recurrences: how many times the same failure pattern reappeared.&#10;&#10;Verdicts:&#10;  pending — waiting for data (checked nightly)&#10;  effective — no recurrences after 7+ days&#10;  ineffective — 3+ recurrences, the improvement didn't help">?</span>
+      </h3>
+      <span class="section-meta">Past improvements</span>
+      <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    {# ---- Escalation Callout ---- #}
+    {% if retrospector.escalations %}
+    <div class="retro-escalation-callout">
+      <div class="retro-escalation-header">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1l7 13H1L8 1z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+          <path d="M8 6v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="8" cy="11.5" r="0.75" fill="currentColor"/>
+        </svg>
+        <strong>Escalation Needed</strong>
+        <span class="retro-escalation-subtitle">These targets have been proposed {{ retrospector.escalations[0].times_proposed }}+ times &mdash; memory-based fixes aren't working</span>
+      </div>
+      {% for esc in retrospector.escalations %}
+      <div class="retro-escalation-item">
+        <div class="retro-escalation-target">
+          <code>{{ esc.target | replace('memory/', '') }}</code>
+          <span class="retro-escalation-count">{{ esc.times_proposed }}x</span>
+        </div>
+        <div class="retro-escalation-rec">{{ esc.recommendation }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if retrospector.effectiveness %}
+    {# Verdict distribution bar #}
+    {% set v_effective = retrospector.effectiveness | selectattr('verdict', 'equalto', 'effective') | list | length %}
+    {% set v_ineffective = retrospector.effectiveness | selectattr('verdict', 'equalto', 'ineffective') | list | length %}
+    {% set v_pending = retrospector.effectiveness | length - v_effective - v_ineffective %}
+    {% set v_total = retrospector.effectiveness | length %}
+    <div class="retro-dist-bar" data-tip="effective: {{ v_effective }} / pending: {{ v_pending }} / ineffective: {{ v_ineffective }}">
+      {% if v_effective %}<div class="retro-dist-seg retro-dist-effective" style="width: {{ (v_effective / v_total * 100) | round }}%"><span>{{ v_effective }} effective</span></div>{% endif %}
+      {% if v_pending %}<div class="retro-dist-seg retro-dist-pending" style="width: {{ (v_pending / v_total * 100) | round }}%"><span>{{ v_pending }} pending</span></div>{% endif %}
+      {% if v_ineffective %}<div class="retro-dist-seg retro-dist-ineffective" style="width: {{ (v_ineffective / v_total * 100) | round }}%"><span>{{ v_ineffective }} ineffective</span></div>{% endif %}
+    </div>
+
+    <div class="retro-table-wrap">
+      <table class="alloc-table retro-table" id="eff-table">
+        <thead>
+          <tr>
+            <th class="eff-sortable" data-col="0" data-type="text">Improvement <span class="eff-sort-icon"></span></th>
+            <th class="eff-sortable" data-col="1" data-type="text" style="width: 5rem;">Agent <span class="eff-sort-icon"></span></th>
+            <th class="eff-sortable" data-col="2" data-type="date" style="width: 5rem;">Date <span class="eff-sort-icon"></span></th>
+            <th class="eff-sortable" data-col="3" data-type="text" style="width: 4rem;">Status <span class="eff-sort-icon"></span></th>
+            <th class="eff-sortable" data-col="4" data-type="num" style="width: 5rem;">Recurrences <span class="eff-sort-icon"></span></th>
+            <th class="eff-sortable" data-col="5" data-type="num" style="width: 5rem;">Times Proposed
+              <span class="retro-help" data-tip="How many times improvements have targeted this same file.&#10;High counts indicate a recurring problem area&#10;where memory-based fixes aren't sticking.">?</span>
+              <span class="eff-sort-icon"></span>
+            </th>
+            <th class="eff-sortable" data-col="6" data-type="text" style="width: 4rem;">Verdict <span class="eff-sort-icon"></span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for eff in retrospector.effectiveness %}
+          <tr>
+            <td data-tip="{{ eff.improvement_path }}">{{ eff.improvement | replace('memory/', '') }}</td>
+            <td><span class="retro-agent retro-agent-{{ eff.source_agent | lower }}">{{ eff.source_agent }}</span></td>
+            <td>{{ eff.date }}</td>
+            <td>{{ eff.status }}</td>
+            <td style="text-align: center;">{{ eff.recurrences }}</td>
+            <td style="text-align: center;">
+              {% if eff.times_proposed >= 3 %}
+              <span style="color: var(--error, #f44336); font-weight: 600;">{{ eff.times_proposed }}</span>
+              {% elif eff.times_proposed >= 2 %}
+              <span style="color: var(--warning, #f59e0b); font-weight: 600;">{{ eff.times_proposed }}</span>
+              {% else %}
+              {{ eff.times_proposed }}
+              {% endif %}
+            </td>
+            <td>{{ eff.verdict }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div id="eff-pagination" class="eff-pagination"></div>
+    {% else %}
+    <div class="retro-empty">
+      <p>No historical effectiveness data yet. Verdicts appear after improvements have been active for multiple runs.</p>
+    </div>
+    {% endif %}
+</section>
+
+{# /effectiveness group #}
+</div>{# end .sortable-panels (effectiveness) #}
+
+<div class="sortable-panels retro-tab-panel" data-sort-key="promotions" data-tab-id="promotions" hidden>
+
+{# ---- Escalation History (full width) ---- #}
+<section class="section-card collapsible-section" data-collapse-id="retro-escalation-history" data-panel-id="retro-escalation-history">
+  <div class="section-header collapsible-toggle">
+    <h3>Escalation History
+      <span class="retro-help" data-tip="When a memory-based improvement has been proposed 5+ times&#10;without reducing failures, the escalate phase promotes it&#10;to a more effective mechanism:&#10;&#10;• promote_to_claude_md — rule added to CLAUDE.md (always loaded)&#10;• flag_for_human_review — code-level target, needs manual fix&#10;&#10;Runs nightly after the report phase.">?</span>
+    </h3>
+    <span class="section-meta">
+      {% if escalation_log %}{{ escalation_log | length }} escalation{{ 's' if escalation_log | length != 1 }}{% else %}No escalations yet{% endif %}
+    </span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  {% if escalation_log %}
+  <div class="retro-table-wrap">
+    <table class="alloc-table retro-table retro-table-expandable">
+      <thead>
+        <tr>
+          <th style="width: 6rem;">Date</th>
+          <th>Target</th>
+          <th style="width: 4rem;">Proposals</th>
+          <th style="width: 10rem;">Action</th>
+          <th>Detail</th>
+          <th style="width: 1.5rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in escalation_log | reverse %}
+        {% set section_name = entry.detail | replace('Promoted to CLAUDE.md section: ', '') %}
+        {% set section_content = escalation_content.get(section_name, '') if escalation_content is defined else '' %}
+        {% set has_detail = section_content or entry.resolution %}
+        <tr class="{% if has_detail %}retro-row {% endif %}escalation-detail-row">
+          <td>{{ entry.date }}</td>
+          <td><code>{{ entry.target | replace('memory/', '') }}</code></td>
+          <td style="text-align: center;">
+            <span style="color: var(--error, #f44336); font-weight: 600;">{{ entry.times_proposed }}</span>
+          </td>
+          <td>
+            {% if entry.action == 'promote_to_claude_md' %}
+            <span class="retro-change-badge retro-change-created">CLAUDE.md</span>
+            {% elif entry.action == 'flag_for_human_review' %}
+            <span class="retro-change-badge retro-change-notfound">Human Review</span>
+            {% else %}
+            <span class="retro-change-badge retro-change-nochange">{{ entry.action | replace('_', ' ') }}</span>
+            {% endif %}
+            {% if entry.resolved %}
+            <span class="retro-change-badge retro-change-created" title="Resolved {{ entry.resolved }}">Resolved</span>
+            {% endif %}
+          </td>
+          <td class="retro-desc">{{ entry.detail }}</td>
+          <td>
+            {% if has_detail %}
+            <svg class="retro-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {% endif %}
+          </td>
+        </tr>
+        {% if has_detail %}
+        <tr class="retro-detail-row" hidden>
+          <td colspan="6" class="retro-detail-cell">
+            {% if entry.resolution %}
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">Resolution &mdash; {{ entry.resolved }}</div>
+              <p class="retro-detail-text">{{ entry.resolution }}</p>
+            </div>
+            {% endif %}
+            {% if section_content %}
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">CLAUDE.md &sect; {{ section_name }}</div>
+              <pre class="retro-file-content">{{ section_content }}</pre>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="retro-empty">
+    <p>No escalations yet. When improvements are proposed 5+ times without effect, the retrospector will automatically promote them to CLAUDE.md or flag for human review.</p>
+  </div>
+  {% endif %}
+</section>
+
+{# ---- Hook Enforcements (full width) ---- #}
+<section class="section-card collapsible-section" data-collapse-id="retro-hook-enforcements" data-panel-id="retro-hook-enforcements">
+  <div class="section-header collapsible-toggle">
+    <h3>Hook Enforcements
+      <span class="retro-help" data-tip="Deterministic hooks installed in response to retrospector&#10;meta-improvements. When a behavioral rule fails memory-based&#10;reinforcement repeatedly, a PreToolUse / PostToolUse hook&#10;enforces it at the harness level instead.&#10;&#10;Hooks live in ~/.claude/hooks/ and are wired in&#10;~/.claude/settings.json.">?</span>
+    </h3>
+    <span class="section-meta">
+      {% if hook_enforcements %}{{ hook_enforcements | length }} active{% else %}None installed{% endif %}
+    </span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  {% if hook_enforcements %}
+  <div class="retro-table-wrap">
+    <table class="alloc-table retro-table retro-table-expandable">
+      <thead>
+        <tr>
+          <th style="width: 6rem;">Date</th>
+          <th>Rule</th>
+          <th style="width: 12rem;">Matcher</th>
+          <th>Description</th>
+          <th style="width: 7rem;">Source Meta</th>
+          <th style="width: 1.5rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in hook_enforcements | reverse %}
+        <tr class="retro-row">
+          <td>{{ h.date }}</td>
+          <td><code>{{ h.rule }}</code></td>
+          <td><code style="font-size: 0.75rem;">{{ h.matcher }}</code></td>
+          <td class="retro-desc">{{ h.description }}</td>
+          <td>
+            {% if h.source_meta_date %}
+            <a href="/retrospector/{{ h.source_meta_date }}" class="retro-date-pill" style="font-size: 0.7rem; padding: 0.15rem 0.5rem;">{{ h.source_meta_date }}</a>
+            {% endif %}
+          </td>
+          <td>
+            <svg class="retro-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </td>
+        </tr>
+        <tr class="retro-detail-row" hidden>
+          <td colspan="6" class="retro-detail-cell">
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">Hook Script</div>
+              <div class="retro-change-info">
+                <span class="retro-change-badge retro-change-created">Installed</span>
+                <code>{{ h.hook_script }}</code>
+              </div>
+            </div>
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">Settings Wiring</div>
+              <p class="retro-detail-text">
+                <code>{{ h.settings_path }}</code> &mdash; PreToolUse matcher <code>{{ h.matcher }}</code>
+              </p>
+            </div>
+            {% if h.rationale %}
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">Rationale</div>
+              <p class="retro-detail-text">{{ h.rationale }}</p>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="retro-empty">
+    <p>No hook enforcements installed yet. When a meta-improvement recommends deterministic enforcement (e.g., a recurring rule that memory can't fix), the installed hook is recorded here.</p>
+  </div>
+  {% endif %}
+</section>
+
+</div>{# end .sortable-panels (promotions) #}
+
+<div class="sortable-panels retro-tab-panel" data-sort-key="hygiene" data-tab-id="hygiene" hidden>
+
+{# ---- Consolidation History (full width) ---- #}
+<section class="section-card collapsible-section" data-collapse-id="retro-consolidation" data-panel-id="retro-consolidation">
+  <div class="section-header collapsible-toggle">
+    <h3>Memory Consolidation History
+      <span class="retro-help" data-tip="Runs every Friday at 11:30 PM.&#10;&#10;Merges individual feedback_*.md memory files into broader&#10;principle files grouped by theme (e.g., git workflow, shell tools).&#10;&#10;Prevents memory bloat — only the first 200 lines of MEMORY.md&#10;are loaded per session, so the index must stay concise.&#10;&#10;Input: individual feedback files found.&#10;Output: consolidated principle files created.&#10;Removed: individual files absorbed into principles.">?</span>
+    </h3>
+    <span class="section-meta">Weekly cleanup</span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  {% if consolidation_log %}
+  <div class="retro-table-wrap">
+    <table class="alloc-table retro-table">
+      <thead>
+        <tr>
+          <th style="width: 6rem;">Date</th>
+          <th style="width: 4rem;">Input</th>
+          <th style="width: 4rem;">Output</th>
+          <th style="width: 5rem;">Removed</th>
+          <th>Principles Created</th>
+          <th style="width: 2rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in consolidation_log | reverse %}
+        <tr class="retro-row consolidation-row">
+          <td>{{ entry.date }}</td>
+          <td style="text-align: center;">{{ entry.input_files }}</td>
+          <td style="text-align: center;">{{ entry.output_files }}</td>
+          <td style="text-align: center;">{{ entry.removed_files }}</td>
+          <td>
+            {% for p in entry.principles %}
+            <span class="retro-category retro-cat-missing_context" style="margin-right: 0.25rem;" data-tip="{{ p.description }}">{{ p.filename | replace('feedback_principle_', '') | replace('.md', '') }}</span>
+            {% endfor %}
+          </td>
+          <td>
+            <svg class="retro-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </td>
+        </tr>
+        <tr class="retro-detail-row" hidden>
+          <td colspan="7" class="retro-detail-cell">
+            {% for p in entry.principles %}
+            <div class="retro-detail-section">
+              <div class="retro-detail-heading">{{ p.filename }}</div>
+              <p class="retro-detail-text">{{ p.description }}</p>
+              <div class="retro-change-info" style="margin-top: 0.25rem;">
+                <span class="retro-change-note">Absorbed {{ p.absorbed | length }} files:</span>
+                {% for f in p.absorbed %}
+                <code style="margin-left: 0.25rem; font-size: 0.7rem;">{{ f | replace('feedback_', '') | replace('.md', '') }}</code>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="retro-empty">
+    <p>No consolidation history yet. Run <code>retrospector.sh --phase consolidate</code> to merge feedback files into principles.</p>
+  </div>
+  {% endif %}
+</section>
+
+</div>{# end .sortable-panels #}
+
+<script>
+document.querySelectorAll('.retro-row').forEach(function(row) {
+  var detailRow = row.nextElementSibling;
+  var fallback = detailRow.querySelector('.retro-item-content[data-target]');
+  var loaded = false;
+
+  row.addEventListener('click', function() {
+    var isOpen = !detailRow.hidden;
+    detailRow.hidden = isOpen;
+    row.classList.toggle('retro-row-open', !isOpen);
+
+    // Only fetch if there's a fallback placeholder (no inline content)
+    if (!isOpen && !loaded && fallback) {
+      loaded = true;
+      var target = fallback.getAttribute('data-target');
+      var filename = target.split('/').pop();
+      fetch('/api/memory/' + encodeURIComponent(filename))
+        .then(function(res) {
+          if (res.status === 404) return null;
+          return res.text();
+        })
+        .then(function(text) {
+          if (text) {
+            fallback.innerHTML = '<pre class="retro-file-content">' +
+              text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+              '</pre>';
+          }
+          // If null (404), leave the "not available" message as-is
+        })
+        .catch(function() {});
+    }
+  });
+});
+</script>
+
+{# Tooltip handled globally by base.html #}
+
+<style>
+.eff-sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.eff-sortable:hover {
+  color: var(--primary, #90caf9);
+}
+.eff-sort-icon::after {
+  content: '⇅';
+  opacity: 0.3;
+  font-size: 0.7rem;
+  margin-left: 0.25rem;
+}
+.eff-sortable.sort-asc .eff-sort-icon::after {
+  content: '▲';
+  opacity: 0.7;
+}
+.eff-sortable.sort-desc .eff-sort-icon::after {
+  content: '▼';
+  opacity: 0.7;
+}
+.eff-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  font-size: 0.8rem;
+}
+.eff-page-btn {
+  background: var(--surface-container, #1e1e1e);
+  color: var(--on-surface, #e0e0e0);
+  border: 1px solid var(--outline-variant, #444);
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+.eff-page-btn:hover {
+  background: var(--surface-container-high, #2b2b2b);
+}
+.eff-page-btn.active {
+  background: var(--primary, #90caf9);
+  color: var(--on-primary, #000);
+  border-color: var(--primary, #90caf9);
+}
+.eff-page-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.eff-page-info {
+  color: var(--on-surface-variant, #aaa);
+}
+</style>
+
+<script>
+(function() {
+  var table = document.getElementById('eff-table');
+  if (!table) return;
+
+  var tbody = table.querySelector('tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  var headers = table.querySelectorAll('.eff-sortable');
+  var PAGE_SIZE = 10;
+  var currentPage = 0;
+  var sortCol = -1;
+  var sortDir = 0; // 0=none, 1=asc, -1=desc
+
+  function getCellValue(row, col, type) {
+    var cell = row.cells[col];
+    var text = (cell.textContent || '').trim();
+    if (type === 'num') return parseInt(text, 10) || 0;
+    if (type === 'date') return text;
+    return text.toLowerCase();
+  }
+
+  function sortRows() {
+    if (sortCol < 0) return;
+    var type = headers[sortCol].getAttribute('data-type');
+    rows.sort(function(a, b) {
+      var va = getCellValue(a, sortCol, type);
+      var vb = getCellValue(b, sortCol, type);
+      if (va < vb) return -1 * sortDir;
+      if (va > vb) return 1 * sortDir;
+      return 0;
+    });
+  }
+
+  function renderPage() {
+    var start = currentPage * PAGE_SIZE;
+    var end = start + PAGE_SIZE;
+    var totalPages = Math.ceil(rows.length / PAGE_SIZE);
+
+    // Clear and re-append sorted rows
+    while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+    rows.slice(start, end).forEach(function(row) {
+      tbody.appendChild(row);
+    });
+
+    // Pagination controls
+    var pag = document.getElementById('eff-pagination');
+    if (rows.length <= PAGE_SIZE) {
+      pag.innerHTML = '';
+      return;
+    }
+
+    var html = '<span class="eff-page-info">' +
+      (start + 1) + '–' + Math.min(end, rows.length) +
+      ' of ' + rows.length + '</span>';
+    html += '<button class="eff-page-btn" data-page="prev"' +
+      (currentPage === 0 ? ' disabled' : '') + '>&laquo;</button>';
+    for (var i = 0; i < totalPages; i++) {
+      html += '<button class="eff-page-btn' +
+        (i === currentPage ? ' active' : '') +
+        '" data-page="' + i + '">' + (i + 1) + '</button>';
+    }
+    html += '<button class="eff-page-btn" data-page="next"' +
+      (currentPage >= totalPages - 1 ? ' disabled' : '') + '>&raquo;</button>';
+    pag.innerHTML = html;
+
+    pag.querySelectorAll('.eff-page-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var p = btn.getAttribute('data-page');
+        if (p === 'prev') currentPage = Math.max(0, currentPage - 1);
+        else if (p === 'next') currentPage = Math.min(totalPages - 1, currentPage + 1);
+        else currentPage = parseInt(p, 10);
+        renderPage();
+      });
+    });
+  }
+
+  headers.forEach(function(th) {
+    th.addEventListener('click', function() {
+      var col = parseInt(th.getAttribute('data-col'), 10);
+      // Toggle sort direction
+      if (sortCol === col) {
+        sortDir = sortDir === 1 ? -1 : 1;
+      } else {
+        sortCol = col;
+        sortDir = 1;
+      }
+      // Update header styles
+      headers.forEach(function(h) {
+        h.classList.remove('sort-asc', 'sort-desc');
+      });
+      th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+
+      sortRows();
+      currentPage = 0;
+      renderPage();
+    });
+  });
+
+  // Default sort: date descending
+  sortCol = 2;
+  sortDir = -1;
+  headers[2].classList.add('sort-desc');
+  sortRows();
+  renderPage();
+})();
+</script>
+
+<style>
+.collapsible-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.collapsible-toggle .section-meta {
+  margin-left: auto;
+}
+.collapse-chevron {
+  margin-left: 0.75rem;
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.collapsible-toggle:hover .collapse-chevron {
+  opacity: 1;
+}
+.collapsible-section.collapsed .collapse-chevron {
+  transform: rotate(-90deg);
+}
+.collapsible-section.collapsed > *:not(.section-header) {
+  display: none;
+}
+</style>
+
+<script>
+(function() {
+  var STORAGE_KEY = 'retro-collapsed-sections';
+
+  function loadState() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  var state = loadState();
+
+  document.querySelectorAll('.collapsible-section').forEach(function(section) {
+    var id = section.getAttribute('data-collapse-id');
+    var toggle = section.querySelector('.collapsible-toggle');
+    if (!id || !toggle) return;
+
+    // Restore saved state
+    if (state[id]) {
+      section.classList.add('collapsed');
+    }
+
+    toggle.addEventListener('click', function(e) {
+      // Don't collapse when clicking sort headers inside the section
+      if (e.target.closest('.eff-sortable')) return;
+
+      var isCollapsed = section.classList.toggle('collapsed');
+      state[id] = isCollapsed;
+      saveState(state);
+    });
+  });
+})();
+</script>
+
+<script>
+(function() {
+  var STORAGE_KEY = 'retro-active-tab';
+  var DEFAULT_TAB = 'this-run';
+
+  var tabs = Array.from(document.querySelectorAll('.retro-tab'));
+  var panels = Array.from(document.querySelectorAll('.retro-tab-panel'));
+  if (!tabs.length || !panels.length) return;
+
+  function activate(tabId) {
+    tabs.forEach(function(t) {
+      t.classList.toggle('active', t.getAttribute('data-tab') === tabId);
+    });
+    panels.forEach(function(p) {
+      p.hidden = p.getAttribute('data-tab-id') !== tabId;
+    });
+    try { localStorage.setItem(STORAGE_KEY, tabId); } catch (e) {}
+  }
+
+  var saved;
+  try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) { saved = null; }
+  var initial = saved && tabs.some(function(t) { return t.getAttribute('data-tab') === saved; })
+    ? saved : DEFAULT_TAB;
+  activate(initial);
+
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      activate(tab.getAttribute('data-tab'));
+    });
+  });
+})();
+</script>
+
+{% endblock %}

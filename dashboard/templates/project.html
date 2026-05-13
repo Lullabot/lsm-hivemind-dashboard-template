@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+{% block title %}{{ slug }} — PM Dashboard{% endblock %}
+{% block content %}
+
+<div class="breadcrumb">
+  <a href="{{ url_for('dashboard') }}">Dashboard</a> &rsaquo;
+  <div class="project-switcher-wrap" id="project-switcher">
+    <button class="project-switcher-btn" id="project-switcher-btn">
+      <span class="project-switcher-dot" style="background: {{ project.color }};"></span>
+      <span>{{ slug }}</span>
+      <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="project-switcher-menu" id="project-switcher-menu">
+      {% for p in dashboard.projects %}
+      <a href="/project/{{ p.name }}" class="project-switcher-item{% if p.name == slug %} active{% endif %}">
+        <span class="project-switcher-dot" style="background: {{ p.color }};"></span>
+        <span>{{ p.name }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="page-header project-page-header" style="margin-bottom: 2rem; border-left: 3px solid {{ project.color }}; padding-left: 1rem;">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;">
+      <h2 class="page-title">{{ project.name }}</h2>
+      <span class="status-pill status-{{ project.status_class }}">{{ project.status }}</span>
+    </div>
+    <p class="page-subtitle">{{ project.client }} &middot; {{ project.type }}</p>
+  </div>
+</div>
+
+<div class="sortable-panels">
+{# ---- Status + Budget Row ---- #}
+<div class="detail-grid">
+  <div class="section-card" data-panel-id="project-status">
+    <div class="section-header">
+      <h3>Current Status</h3>
+    </div>
+    <p style="font-size: 0.875rem; line-height: 1.6; padding: 0 1.5rem 1.25rem;">
+      {{ detail.current_status }}
+    </p>
+    {# Work type breakdown (primary metric) #}
+    {% set wt = work_type.get(slug, {}) %}
+    {% if wt and wt.total_hours > 0 %}
+    <div style="padding: 0 1.5rem 1.5rem;">
+      <div class="budget-header">
+        <span class="budget-label">Work Type Breakdown</span>
+        <span class="budget-numbers">{{ wt.total_hours }}h logged</span>
+      </div>
+      <div class="work-type-bar work-type-bar-lg">
+        {% if wt.maintenance_pct > 0 %}
+        <div class="work-type-fill work-type-maintenance" style="width: {{ wt.maintenance_pct }}%;" data-tip="Maintenance: {{ wt.maintenance_hours }}h"></div>
+        {% endif %}
+        {% if wt.professional_pct > 0 %}
+        <div class="work-type-fill work-type-professional" style="width: {{ wt.professional_pct }}%;" data-tip="Professional: {{ wt.professional_hours }}h"></div>
+        {% endif %}
+        {% if wt.untagged_pct > 0 %}
+        <div class="work-type-fill work-type-untagged" style="width: {{ wt.untagged_pct }}%;" data-tip="Untagged: {{ wt.untagged_hours }}h"></div>
+        {% endif %}
+      </div>
+      <div class="work-type-legend" style="margin-top: 0.75rem;">
+        {% if wt.maintenance_hours > 0 %}
+        <span class="wt-legend-item"><span class="wt-dot wt-dot-maintenance"></span>Maintenance <strong>{{ wt.maintenance_hours }}h</strong> ({{ wt.maintenance_pct }}%)</span>
+        {% endif %}
+        {% if wt.professional_hours > 0 %}
+        <span class="wt-legend-item"><span class="wt-dot wt-dot-professional"></span>Professional <strong>{{ wt.professional_hours }}h</strong> ({{ wt.professional_pct }}%)</span>
+        {% endif %}
+        {% if wt.untagged_hours > 0 %}
+        <span class="wt-legend-item"><span class="wt-dot wt-dot-untagged"></span>Untagged <strong>{{ wt.untagged_hours }}h</strong> ({{ wt.untagged_pct }}%)</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {# Budget (secondary) #}
+    {% if detail.hours_total > 0 %}
+    <div style="padding: 0 1.5rem 1.5rem;">
+      <span style="font-size: 0.75rem; color: var(--on-surface-variant);">Budget: {{ detail.hours_logged | round(1) }}h / {{ detail.hours_total | round(0) | int }}h ({{ detail.budget_pct }}%) &middot; {{ (detail.hours_total - detail.hours_logged) | round(1) }}h remaining</span>
+    </div>
+    {% elif detail.budget_text %}
+    <p style="font-size: 0.75rem; padding: 0 1.5rem 1.5rem; color: var(--on-surface-variant);">
+      {{ detail.budget_text }}
+    </p>
+    {% endif %}
+  </div>
+
+  {# ---- Deployment Schedule ---- #}
+  {% set deploys = deployments.projects.get(slug, {}) %}
+  {% if deploys.staging or deploys.production %}
+  <div class="section-card" data-panel-id="project-deploy">
+    <div class="section-header">
+      <h3>Deployment Schedule</h3>
+    </div>
+    <div class="deploy-detail-grid">
+      {% for env_type, label in [('staging', 'Staging'), ('production', 'Production')] %}
+      {% set deploy = deploys.get(env_type) %}
+      <div class="deploy-detail-col">
+        <h4 class="deploy-env-label">{{ label }}</h4>
+        {% if deploy %}
+        <div class="deploy-detail-date">{{ deploy.start[:10] }}</div>
+        <div class="deploy-detail-countdown {% if deploy.days_until <= 3 %}deploy-imminent{% elif deploy.days_until <= 7 %}deploy-soon{% else %}deploy-clear{% endif %}">
+          {% if deploy.days_until == 0 %}Today
+          {% elif deploy.days_until == 1 %}Tomorrow
+          {% elif deploy.days_until < 0 %}{{ -deploy.days_until }}d overdue
+          {% else %}in {{ deploy.days_until }} days{% endif %}
+        </div>
+        <div class="deploy-detail-summary">{{ deploy.summary }}</div>
+        {% if deploy.attendees %}
+        <div class="deploy-detail-attendees">
+          {% for a in deploy.attendees %}
+          <span class="deploy-attendee">{{ a.split('@')[0] }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="deploy-detail-none">Not scheduled</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ---- Blockers ---- #}
+  {% if detail.blockers %}
+  <div class="section-card section-attention" data-panel-id="project-blockers">
+    <div class="section-header">
+      <h3>Blockers &amp; Risks</h3>
+    </div>
+    <p style="font-size: 0.875rem; line-height: 1.6; padding: 0 1.5rem 1.5rem;">
+      {{ detail.blockers }}
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{# ---- Active Work ---- #}
+{% if detail.work_items %}
+<section class="section-card" data-panel-id="project-work">
+  <div class="section-header">
+    <h3>Active Work</h3>
+    <span class="section-meta">{{ detail.work_items | length }} items</span>
+  </div>
+  <div class="work-list">
+    {% for item in detail.work_items %}
+    <div class="work-item">
+      <span class="work-number">{{ loop.index }}</span>
+      <span class="work-text">{{ item }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ---- Open PRs (with staleness) ---- #}
+{% set project_prs = staleness.prs.get(slug, []) %}
+{% if project_prs %}
+<section class="section-card" data-panel-id="project-prs">
+  <div class="section-header">
+    <h3>Open Pull Requests</h3>
+    {% set stale_count = project_prs | selectattr('staleness', 'ne', 'fresh') | rejectattr('is_bot') | list | length %}
+    <span class="section-meta">{{ project_prs | length }} open{% if stale_count %} &middot; {{ stale_count }} stale{% endif %}</span>
+  </div>
+  <div class="pr-detail-list">
+    {% for pr in project_prs | sort(attribute='idle_days', reverse=true) %}
+    <div class="pr-detail-item pr-detail-{{ pr.staleness }}">
+      <div class="pr-detail-header">
+        <span class="pr-badge pr-badge-{{ pr.staleness }}">#{{ pr.number }}</span>
+        <span class="pr-detail-title">{{ pr.title }}</span>
+      </div>
+      <div class="pr-detail-meta">
+        <span>{{ pr.author }}{% if pr.is_bot %} (bot){% endif %}</span>
+        <span>{{ pr.age_days }}d old</span>
+        <span>{{ pr.idle_days }}d idle</span>
+        {% if pr.reason %}<span class="stale-reason stale-reason-{{ pr.staleness }}">{{ pr.reason }}</span>{% endif %}
+        {% if pr.is_draft %}<span class="stale-draft">Draft</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% elif detail.open_prs %}
+<section class="section-card" data-panel-id="project-prs">
+  <div class="section-header">
+    <h3>Open Pull Requests</h3>
+    <span class="section-meta">{{ detail.open_prs | length }} open</span>
+  </div>
+  <div class="pr-list">
+    {% for pr in detail.open_prs %}
+    <span class="pr-badge">#{{ pr }}</span>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ---- Latest from Meetings ---- #}
+{% if meeting_notes and meeting_notes.meetings %}
+<section class="section-card" data-panel-id="project-meetings">
+  <div class="section-header">
+    <h3>Latest from Meetings</h3>
+    <span class="section-meta">{{ meeting_notes.meetings | length }} recent</span>
+  </div>
+
+  {# Action Items (flattened from all recent meetings) #}
+  {% if meeting_notes.all_action_items %}
+  <div class="meeting-section">
+    <h4 class="meeting-section-title">Action Items</h4>
+    <div class="meeting-action-group" data-status="open">
+      <div class="meeting-action-group-header">
+        <span class="meeting-action-group-label">Open</span>
+        <span class="meeting-action-group-count" data-count-for="open">0</span>
+      </div>
+      <div class="meeting-action-list" data-list="open">
+        {% for item in meeting_notes.all_action_items %}
+        <div class="meeting-action-item" data-key="{{ item.key }}">
+          <button class="meeting-dismiss-btn" title="Mark as done" data-key="{{ item.key }}" data-slug="{{ slug }}">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0.5" y="0.5" width="13" height="13" rx="2" stroke="currentColor"/></svg>
+          </button>
+          <div class="meeting-action-desc">{{ item.description }}</div>
+          <div class="meeting-action-meta">
+            {% if item.owner %}<span class="meeting-owner">{{ item.owner }}</span>{% endif %}
+            <span class="meeting-date">{{ item.date }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="meeting-action-group" data-status="done">
+      <div class="meeting-action-group-header">
+        <span class="meeting-action-group-label">Done</span>
+        <span class="meeting-action-group-count" data-count-for="done">0</span>
+      </div>
+      <div class="meeting-action-list" data-list="done"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Recent Decisions (from most recent meeting only) #}
+  {% set latest = meeting_notes.meetings[0] %}
+  {% if latest.decisions %}
+  <div class="meeting-section">
+    <h4 class="meeting-section-title">Recent Decisions <span class="meeting-section-date">{{ latest.date }}</span></h4>
+    <ul class="meeting-decisions-list">
+      {% for dec in latest.decisions %}
+      <li>{{ dec }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# Meeting timeline #}
+  <div class="meeting-timeline">
+    {% for mtg in meeting_notes.meetings %}
+    <div class="meeting-timeline-item">
+      <span class="meeting-timeline-date">{{ mtg.date }}</span>
+      <span class="meeting-timeline-title">{{ mtg.title }}</span>
+      <span class="meeting-timeline-counts">
+        {% if mtg.action_items %}{{ mtg.action_items | length }} action{{ 's' if mtg.action_items | length != 1 }}{% endif %}
+        {% if mtg.action_items and mtg.decisions %}&middot;{% endif %}
+        {% if mtg.decisions %}{{ mtg.decisions | length }} decision{{ 's' if mtg.decisions | length != 1 }}{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+</div>{# end .sortable-panels #}
+
+<script>
+(function() {
+  var wrap = document.getElementById('project-switcher');
+  var btn = document.getElementById('project-switcher-btn');
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    wrap.classList.toggle('open');
+  });
+  document.addEventListener('click', function() {
+    wrap.classList.remove('open');
+  });
+})();
+
+// Meeting action dismiss
+(function() {
+  var UNCHECKED_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0.5" y="0.5" width="13" height="13" rx="2" stroke="currentColor"/></svg>';
+  var CHECKED_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0.5" y="0.5" width="13" height="13" rx="2" stroke="currentColor"/><polyline points="3.5,7.5 6,10 10.5,4.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+
+  var openList = document.querySelector('[data-list="open"]');
+  var doneList = document.querySelector('[data-list="done"]');
+
+  function applyState(item, dismissed) {
+    item.classList.toggle('dismissed', dismissed);
+    var btn = item.querySelector('.meeting-dismiss-btn');
+    if (btn) {
+      btn.innerHTML = dismissed ? CHECKED_SVG : UNCHECKED_SVG;
+      btn.title = dismissed ? 'Mark as not done' : 'Mark as done';
+    }
+    var target = dismissed ? doneList : openList;
+    if (target && item.parentNode !== target) {
+      target.appendChild(item);
+    }
+  }
+
+  function updateCount() {
+    var openCount = openList ? openList.querySelectorAll('.meeting-action-item').length : 0;
+    var doneCount = doneList ? doneList.querySelectorAll('.meeting-action-item').length : 0;
+    var meta = document.querySelector('[data-panel-id="project-meetings"] .section-meta');
+    if (meta) {
+      meta.textContent = openCount + ' open';
+    }
+    var openBadge = document.querySelector('[data-count-for="open"]');
+    var doneBadge = document.querySelector('[data-count-for="done"]');
+    if (openBadge) openBadge.textContent = openCount;
+    if (doneBadge) doneBadge.textContent = doneCount;
+    // Hide group headers for empty groups
+    document.querySelectorAll('.meeting-action-group').forEach(function(g) {
+      var status = g.dataset.status;
+      var n = status === 'open' ? openCount : doneCount;
+      g.style.display = n ? '' : 'none';
+    });
+  }
+
+  // Load initial state — mark dismissed items but keep them visible
+  fetch('/api/actions/status')
+    .then(function(r) { return r.json(); })
+    .then(function(status) {
+      document.querySelectorAll('.meeting-action-item').forEach(function(el) {
+        if (status[el.dataset.key]) {
+          applyState(el, true);
+        }
+      });
+      updateCount();
+    });
+
+  // Click to toggle dismiss state (item remains visible)
+  document.querySelectorAll('.meeting-dismiss-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var key = btn.dataset.key;
+      var item = btn.closest('.meeting-action-item');
+      fetch('/api/actions/toggle', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({key: key})
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        applyState(item, !!data.dismissed);
+        updateCount();
+        if (data.dismissed) {
+          window.dispatchEvent(new CustomEvent('action-dismissed', {detail: {key: key}}));
+        }
+      });
+    });
+  });
+
+  // Reflect dismissals coming from the global actions panel
+  window.addEventListener('action-dismissed', function(e) {
+    var key = e.detail && e.detail.key;
+    if (!key) return;
+    document.querySelectorAll('.meeting-action-item[data-key="' + key + '"]').forEach(function(item) {
+      applyState(item, true);
+    });
+    updateCount();
+  });
+})();
+</script>
+{% endblock %}

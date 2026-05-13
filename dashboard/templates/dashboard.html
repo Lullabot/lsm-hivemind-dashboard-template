@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — PM Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">PM Dashboard</h2>
+    <p class="page-subtitle">Last updated {{ dashboard.updated }}</p>
+  </div>
+</div>
+
+{# ---- Stats Row ---- #}
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">Projects</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ stats.total_projects }}</span>
+      <span class="stat-badge badge-accent">Active</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Project Health</div>
+    <div class="stat-value-row" style="gap: 0.75rem;">
+      {% set s_ontrack = dashboard.projects | selectattr('status_class', 'equalto', 'on-track') | list | length %}
+      {% set s_active = dashboard.projects | selectattr('status_class', 'equalto', 'active') | list | length %}
+      {% set s_stable = dashboard.projects | selectattr('status_class', 'equalto', 'stable') | list | length %}
+      {% set s_atrisk = dashboard.projects | selectattr('status_class', 'equalto', 'at-risk') | list | length %}
+      {% set s_total = dashboard.projects | length %}
+      {% set pct_ontrack = (s_ontrack / s_total * 100) if s_total else 0 %}
+      {% set pct_active = (s_active / s_total * 100) if s_total else 0 %}
+      {% set pct_stable = (s_stable / s_total * 100) if s_total else 0 %}
+      {% set pct_atrisk = (s_atrisk / s_total * 100) if s_total else 0 %}
+      {% set offset_active = pct_ontrack %}
+      {% set offset_stable = pct_ontrack + pct_active %}
+      {% set offset_atrisk = pct_ontrack + pct_active + pct_stable %}
+      <svg class="status-donut" width="48" height="48" viewBox="0 0 36 36" data-tip="On Track: {{ s_ontrack }}&#10;Active: {{ s_active }}&#10;Stable: {{ s_stable }}&#10;At Risk: {{ s_atrisk }}">
+        <circle class="donut-ring" cx="18" cy="18" r="14" fill="none" stroke="var(--surface-container-high)" stroke-width="4"/>
+        {% if pct_ontrack %}<circle class="donut-seg" cx="18" cy="18" r="14" fill="none" stroke="var(--success, #10b981)" stroke-width="4" stroke-dasharray="{{ pct_ontrack }} {{ 100 - pct_ontrack }}" stroke-dashoffset="25"/>{% endif %}
+        {% if pct_active %}<circle class="donut-seg" cx="18" cy="18" r="14" fill="none" stroke="var(--accent, #06b6d4)" stroke-width="4" stroke-dasharray="{{ pct_active }} {{ 100 - pct_active }}" stroke-dashoffset="{{ 25 - offset_active }}"/>{% endif %}
+        {% if pct_stable %}<circle class="donut-seg" cx="18" cy="18" r="14" fill="none" stroke="var(--primary, #90caf9)" stroke-width="4" stroke-dasharray="{{ pct_stable }} {{ 100 - pct_stable }}" stroke-dashoffset="{{ 25 - offset_stable }}"/>{% endif %}
+        {% if pct_atrisk %}<circle class="donut-seg" cx="18" cy="18" r="14" fill="none" stroke="var(--error, #f44336)" stroke-width="4" stroke-dasharray="{{ pct_atrisk }} {{ 100 - pct_atrisk }}" stroke-dashoffset="{{ 25 - offset_atrisk }}"/>{% endif %}
+      </svg>
+      <div class="donut-legend">
+        {% if s_ontrack %}<span class="donut-leg-item"><span class="donut-dot" style="background: var(--success, #10b981);"></span>{{ s_ontrack }} on track</span>{% endif %}
+        {% if s_active %}<span class="donut-leg-item"><span class="donut-dot" style="background: var(--accent, #06b6d4);"></span>{{ s_active }} active</span>{% endif %}
+        {% if s_stable %}<span class="donut-leg-item"><span class="donut-dot" style="background: var(--primary, #90caf9);"></span>{{ s_stable }} stable</span>{% endif %}
+        {% if s_atrisk %}<span class="donut-leg-item"><span class="donut-dot" style="background: var(--error, #f44336);"></span>{{ s_atrisk }} at risk</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Open PRs</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ stats.total_prs }}</span>
+      {% if stats.stale_prs > 0 %}
+        <span class="stat-badge badge-warning">{{ stats.stale_prs }} stale</span>
+      {% else %}
+        <span class="stat-badge badge-info">Across repos</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Hours Logged</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ "{:,.0f}".format(stats.total_hours) }}</span>
+      <span class="stat-badge badge-neutral">All SOWs</span>
+    </div>
+  </div>
+</div>
+
+<div class="sortable-panels">
+{# ---- Deployment Timeline (one row per project, collapsible) ---- #}
+{% if deployments.projects %}
+{% set all_days = [] %}
+{% for proj_name, proj_data in deployments.projects.items() %}
+  {% if proj_data.staging and proj_data.staging.days_until is defined and proj_data.staging.days_until >= 0 %}
+    {% set _ = all_days.append(proj_data.staging.days_until) %}
+  {% endif %}
+  {% if proj_data.production and proj_data.production.days_until is defined and proj_data.production.days_until >= 0 %}
+    {% set _ = all_days.append(proj_data.production.days_until) %}
+  {% endif %}
+{% endfor %}
+
+{% if all_days %}
+{% set max_days = all_days | max %}
+{% set timeline_max = [max_days, 30] | min %}
+<section class="section-card collapsible-section" data-collapse-id="dash-deploys" data-panel-id="dash-deploys" style="margin-bottom: 1.5rem;">
+  <div class="section-header collapsible-toggle">
+    <h3>Deployment Timeline</h3>
+    <span class="section-meta">Next {{ timeline_max }} days</span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="deploy-timeline">
+    {% for proj_name, proj_data in deployments.projects.items() %}
+    {% set stg = proj_data.staging if (proj_data.staging and proj_data.staging.days_until is defined and proj_data.staging.days_until >= 0 and proj_data.staging.days_until <= timeline_max) else none %}
+    {% set prd = proj_data.production if (proj_data.production and proj_data.production.days_until is defined and proj_data.production.days_until >= 0 and proj_data.production.days_until <= timeline_max) else none %}
+    {% if stg or prd %}
+    {% set color = dashboard.details.get(proj_name, {}).get('color', '#64748b') %}
+    <div class="deploy-tl-row">
+      <span class="deploy-tl-label">
+        <span class="stale-project-dot" style="background: {{ color }};"></span>
+        {{ proj_name }}
+      </span>
+      <div class="deploy-tl-track">
+        {% if stg %}
+        {% set stg_pct = [(stg.days_until / timeline_max * 100) | round, 96] | min %}
+        <div class="deploy-tl-marker deploy-tl-staging {% if stg.days_until <= 3 %}deploy-tl-imminent{% elif stg.days_until <= 7 %}deploy-tl-soon{% endif %}" style="left: {{ stg_pct }}%;" data-tip="{{ stg.summary }}&#10;{{ stg.days_until }} days away">
+          <span class="deploy-tl-tag">stag</span>
+        </div>
+        {% endif %}
+        {% if prd %}
+        {% set prd_pct = [(prd.days_until / timeline_max * 100) | round, 96] | min %}
+        <div class="deploy-tl-marker deploy-tl-production {% if prd.days_until <= 3 %}deploy-tl-imminent{% elif prd.days_until <= 7 %}deploy-tl-soon{% endif %}" style="left: {{ prd_pct }}%;" data-tip="{{ prd.summary }}&#10;{{ prd.days_until }} days away">
+          <span class="deploy-tl-tag">prod</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+    <div class="deploy-tl-row deploy-tl-axis-row">
+      <span class="deploy-tl-label"></span>
+      <div class="deploy-tl-axis">
+        <span>Today</span>
+        <span>{{ (timeline_max / 2) | round | int }}d</span>
+        <span>{{ timeline_max }}d</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+
+{# ---- Project Cards Grid ---- #}
+<div class="project-grid" data-panel-id="dash-projects">
+  {% for project in dashboard.projects %}
+  {% set detail = dashboard.details.get(project.name, {}) %}
+  <a href="{{ url_for('project_detail', slug=project.name) }}" class="project-card" style="--accent: {{ project.color }};">
+    <div class="card-header">
+      <div class="card-accent" style="background: {{ project.color }};"></div>
+      <div class="card-title-area">
+        <h3>{{ project.name }}</h3>
+        <span class="card-client">{{ project.client }}</span>
+      </div>
+      <span class="status-pill status-{{ project.status_class }}">{{ project.status }}</span>
+    </div>
+
+    <p class="card-summary">{{ project.summary }}</p>
+
+    {# Work type split (maintenance vs professional) #}
+    {% set wt = work_type.get(project.name, {}) %}
+    {% if wt and wt.total_hours > 0 %}
+    <div class="work-type-section">
+      <div class="work-type-header">
+        <span class="work-type-label">Work Type</span>
+        <span class="work-type-total">{{ wt.total_hours }}h total</span>
+      </div>
+      <div class="work-type-bar">
+        {% if wt.maintenance_pct > 0 %}
+        <div class="work-type-fill work-type-maintenance" style="width: {{ wt.maintenance_pct }}%;" data-tip="Maintenance: {{ wt.maintenance_hours }}h ({{ wt.maintenance_pct }}%)"></div>
+        {% endif %}
+        {% if wt.professional_pct > 0 %}
+        <div class="work-type-fill work-type-professional" style="width: {{ wt.professional_pct }}%;" data-tip="Professional: {{ wt.professional_hours }}h ({{ wt.professional_pct }}%)"></div>
+        {% endif %}
+        {% if wt.untagged_pct > 0 %}
+        <div class="work-type-fill work-type-untagged" style="width: {{ wt.untagged_pct }}%;" data-tip="Untagged: {{ wt.untagged_hours }}h ({{ wt.untagged_pct }}%)"></div>
+        {% endif %}
+      </div>
+      <div class="work-type-legend">
+        {% if wt.maintenance_hours > 0 %}<span class="wt-legend-item"><span class="wt-dot wt-dot-maintenance"></span>Maint {{ wt.maintenance_hours }}h</span>{% endif %}
+        {% if wt.professional_hours > 0 %}<span class="wt-legend-item"><span class="wt-dot wt-dot-professional"></span>Prof {{ wt.professional_hours }}h</span>{% endif %}
+        {% if wt.untagged_hours > 0 %}<span class="wt-legend-item"><span class="wt-dot wt-dot-untagged"></span>Other {{ wt.untagged_hours }}h</span>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {# Budget (secondary) #}
+    {% if detail.hours_total > 0 %}
+    <div class="budget-secondary">
+      <span class="budget-secondary-text">Budget: {{ detail.hours_logged | round(1) }}h / {{ detail.hours_total | round(0) | int }}h ({{ detail.budget_pct }}%)</span>
+    </div>
+    {% elif detail.budget_text %}
+    <div class="budget-secondary">
+      <span class="budget-secondary-text">{{ detail.budget_text }}</span>
+    </div>
+    {% endif %}
+
+    {# Deployment schedule #}
+    {% set deploys = deployments.projects.get(project.name, {}) %}
+    {% if deploys.staging or deploys.production %}
+    <div class="deploy-row">
+      {% if deploys.staging %}
+      <span class="deploy-badge {% if deploys.staging.days_until <= 3 %}deploy-imminent{% elif deploys.staging.days_until <= 7 %}deploy-soon{% else %}deploy-clear{% endif %}">
+        STG {{ deploys.staging.start[:10] }} ({{ deploys.staging.days_until }}d)
+      </span>
+      {% endif %}
+      {% if deploys.production %}
+      <span class="deploy-badge {% if deploys.production.days_until <= 3 %}deploy-imminent{% elif deploys.production.days_until <= 7 %}deploy-soon{% else %}deploy-clear{% endif %}">
+        PROD {{ deploys.production.start[:10] }} ({{ deploys.production.days_until }}d)
+      </span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# Footer stats #}
+    {% set project_stale = staleness.prs.get(project.name, []) | selectattr('staleness', 'ne', 'fresh') | rejectattr('is_bot') | list %}
+    <div class="card-footer">
+      <span class="card-stat">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 3h4v1.5H6V3zm-3 4h10v1H3V7zm2 3.5h6V12H5v-1.5z" fill="currentColor" opacity="0.5"/></svg>
+        {{ detail.work_items | length }} tasks
+      </span>
+      <span class="card-stat">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1"/><path d="M6 8l1.5 1.5L10 6" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+        {{ detail.open_prs | length }} PRs
+      </span>
+      {% if project_stale %}
+      <span class="card-stat stale-indicator">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L14.5 13H1.5L8 1.5z" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="8" y1="6" x2="8" y2="9.5" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="11.5" r="0.7" fill="currentColor"/></svg>
+        {{ project_stale | length }} stale
+      </span>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{# ---- Cross-Project Themes ---- #}
+{% if dashboard.themes %}
+<section class="section-card" data-panel-id="dash-themes">
+  <div class="section-header">
+    <h3>Cross-Project Themes</h3>
+  </div>
+  <div class="themes-grid">
+    {% for theme in dashboard.themes %}
+    <div class="theme-card">
+      <h4>{{ theme.title }}</h4>
+      <p>{{ theme.detail }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+</div>{# end .sortable-panels #}
+
+<script>
+(function() {
+  var STORAGE_KEY = 'dash-collapsed-sections';
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  var state = loadState();
+  document.querySelectorAll('.collapsible-section').forEach(function(section) {
+    var id = section.getAttribute('data-collapse-id');
+    var toggle = section.querySelector('.collapsible-toggle');
+    if (!id || !toggle) return;
+    if (state[id]) section.classList.add('collapsed');
+    toggle.addEventListener('click', function() {
+      var isCollapsed = section.classList.toggle('collapsed');
+      state[id] = isCollapsed;
+      saveState(state);
+    });
+  });
+})();
+</script>
+
+<style>
+/* Collapsible pattern */
+.collapsible-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.collapsible-toggle .section-meta {
+  margin-left: auto;
+}
+.collapse-chevron {
+  margin-left: 0.75rem;
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.collapsible-toggle:hover .collapse-chevron {
+  opacity: 1;
+}
+.collapsible-section.collapsed .collapse-chevron {
+  transform: rotate(-90deg);
+}
+.collapsible-section.collapsed > *:not(.section-header) {
+  display: none;
+}
+
+/* Deployment timeline */
+.deploy-timeline {
+  padding: 0.5rem 1rem 0.75rem;
+}
+.deploy-tl-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+.deploy-tl-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 6rem;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.deploy-tl-track {
+  flex: 1;
+  height: 20px;
+  position: relative;
+  background: var(--surface-container);
+  border-radius: 4px;
+}
+.deploy-tl-marker {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+.deploy-tl-tag {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.deploy-tl-staging .deploy-tl-tag {
+  background: var(--accent-muted, rgba(6,182,212,0.15));
+  color: var(--accent, #06b6d4);
+}
+.deploy-tl-production .deploy-tl-tag {
+  background: var(--primary-container, rgba(144,202,249,0.15));
+  color: var(--primary, #90caf9);
+}
+.deploy-tl-imminent .deploy-tl-tag {
+  background: var(--error-muted, rgba(244,67,54,0.2));
+  color: var(--error, #f44336);
+  animation: pulse-tag 1.5s ease-in-out infinite;
+}
+.deploy-tl-soon .deploy-tl-tag {
+  background: var(--warning-muted, rgba(245,158,11,0.2));
+  color: var(--warning-text, #f59e0b);
+}
+@keyframes pulse-tag {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.deploy-tl-axis-row {
+  padding-top: 0;
+}
+.deploy-tl-axis {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: var(--on-surface-variant);
+  opacity: 0.5;
+}
+
+.status-donut { flex-shrink: 0; }
+.donut-seg { transition: stroke-dasharray 0.3s ease; }
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.donut-leg-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+.donut-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+</style>
+
+{% endblock %}

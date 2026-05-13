@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.swp
+dashboard/data/bravo-jira.json
+.claude/logs/
+.pytest_cache/

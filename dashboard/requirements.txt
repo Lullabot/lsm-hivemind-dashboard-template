@@ -1,0 +1,8 @@
+starlette>=1.0
+uvicorn
+jinja2
+python-multipart
+markdown
+pyyaml
+pytest
+httpx

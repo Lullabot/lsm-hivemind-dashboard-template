@@ -1,0 +1,18 @@
+{
+  "improvements": [
+    {
+      "description": "Use Read before Edit to avoid blind edits",
+      "proposed_change": "Add Read call before every Edit",
+      "reasoning": "Multiple sessions showed Edit failures due to stale content",
+      "source_agent": "SDSU",
+      "change_made": {"file": "feedback_test.md", "action": "created"}
+    },
+    {
+      "description": "Always pull before push to avoid rejected pushes",
+      "proposed_change": "Add git pull --rebase before push",
+      "reasoning": "3 sessions had push rejections",
+      "source_agent": "root",
+      "change_made": null
+    }
+  ]
+}

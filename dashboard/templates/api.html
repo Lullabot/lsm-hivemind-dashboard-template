@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}API — PM Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">API Explorer</h2>
+    <p class="page-subtitle">Available JSON endpoints for programmatic access</p>
+  </div>
+</div>
+
+<div class="stats-row" style="grid-template-columns: repeat(3, 1fr);">
+  <div class="stat-card">
+    <div class="stat-label">Endpoints</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ endpoints | length }}</span>
+      <span class="stat-badge badge-accent">Available</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Format</div>
+    <div class="stat-value-row">
+      <span class="stat-value" style="font-size: 1.25rem;">JSON</span>
+      <span class="stat-badge badge-info">REST</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Auth</div>
+    <div class="stat-value-row">
+      <span class="stat-value" style="font-size: 1.25rem;">None</span>
+      <span class="stat-badge badge-neutral">Local</span>
+    </div>
+  </div>
+</div>
+
+{# ---- Endpoints ---- #}
+<div class="api-endpoints">
+  {% for ep in endpoints %}
+  <section class="section-card api-endpoint-card">
+    <div class="section-header">
+      <h3>
+        <span class="api-method api-method-{{ ep.method | lower }}">{{ ep.method }}</span>
+        <code class="api-path">{{ ep.path }}</code>
+      </h3>
+      <span class="section-meta">{{ ep.category }}</span>
+    </div>
+    <div class="api-endpoint-body">
+      <p class="api-description">{{ ep.description }}</p>
+      {% if ep.params %}
+      <div class="api-params">
+        <span class="api-params-label">Parameters</span>
+        <table class="api-params-table">
+          {% for param in ep.params %}
+          <tr>
+            <td><code>{{ param.name }}</code></td>
+            <td class="api-param-type">{{ param.type }}</td>
+            <td>{{ param.description }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% endif %}
+      {% if ep.example_response %}
+      <div class="api-example">
+        <span class="api-params-label">Example Response</span>
+        <pre class="api-response-preview">{{ ep.example_response }}</pre>
+      </div>
+      {% endif %}
+      <div class="api-try">
+        <a href="{{ ep.path }}" target="_blank" class="api-try-btn">
+          Open in new tab
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+<style>
+.api-endpoints {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.api-method {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+.api-method-get {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+.api-path {
+  font-size: 0.875rem;
+  color: var(--on-surface);
+}
+.api-endpoint-body {
+  padding: 1rem 1.5rem;
+}
+.api-description {
+  color: var(--on-surface-variant);
+  font-size: 0.8125rem;
+  margin: 0 0 0.75rem;
+}
+.api-params {
+  margin-bottom: 0.75rem;
+}
+.api-params-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--on-surface-variant);
+  margin-bottom: 0.375rem;
+}
+.api-params-table {
+  width: 100%;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+.api-params-table td {
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  border-bottom: 1px solid var(--outline-variant);
+}
+.api-params-table code {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+.api-param-type {
+  color: var(--on-surface-variant);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+.api-example {
+  margin-bottom: 0.75rem;
+}
+.api-response-preview {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  color: var(--on-surface-variant);
+  max-height: 12rem;
+}
+.api-try {
+  padding-top: 0.25rem;
+}
+.api-try-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+  font-size: 0.75rem;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.api-try-btn:hover {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  text-decoration: none;
+}
+</style>
+
+{% endblock %}

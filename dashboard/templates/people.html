@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}People — PM Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Team Activity</h2>
+    <p class="page-subtitle">Time logged across client projects (last 30 days from Noko)</p>
+  </div>
+</div>
+
+{# ---- Summary Stats ---- #}
+{% set total_team_hours = people | map(attribute='total_hours') | sum %}
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">Team Members</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ people | length }}</span>
+      <span class="stat-badge badge-accent">Active</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Hours</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ total_team_hours | round(1) }}</span>
+      <span class="stat-badge badge-info">14 days</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Avg / Person</div>
+    <div class="stat-value-row">
+      <span class="stat-value">{{ (total_team_hours / (people | length)) | round(1) if people else 0 }}</span>
+      <span class="stat-badge badge-neutral">hours</span>
+    </div>
+  </div>
+  {% set total_billable = people | map(attribute='billable_hours') | sum %}
+  {% set team_billable_pct = ((total_billable / total_team_hours) * 100) | round | int if total_team_hours > 0 else 0 %}
+  <div class="stat-card">
+    <div class="stat-label">Billable Rate</div>
+    <div class="stat-value-row">
+      <span class="stat-value {% if team_billable_pct < 70 %}text-danger{% endif %}">{{ team_billable_pct }}%</span>
+      {% if team_billable_pct >= 80 %}
+        <span class="stat-badge badge-success">Healthy</span>
+      {% elif team_billable_pct >= 60 %}
+        <span class="stat-badge badge-warning">Monitor</span>
+      {% else %}
+        <span class="stat-badge badge-danger">Low</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="sortable-panels">
+{# ---- Cross-Project Allocation Table ---- #}
+{% if people %}
+<section class="section-card collapsible-section" data-collapse-id="people-allocation" data-panel-id="people-allocation">
+  <div class="section-header collapsible-toggle">
+    <h3>Cross-Project Allocation</h3>
+    <span class="section-meta">Hours by person per project</span>
+    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div style="overflow-x: auto;">
+    <table class="alloc-table">
+      <thead>
+        <tr>
+          <th class="alloc-name-col">Person</th>
+          {% set all_projects = [] %}
+          {% for person in people %}
+            {% for proj in person.projects %}
+              {% if proj.name not in all_projects %}
+                {% if all_projects.append(proj.name) %}{% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {# Sort: non-client (unbillable) projects first, then the rest. Colors come from each person's projects list. #}
+          {% set sorted_projects = all_projects | sort %}
+          {% set proj_colors = {} %}
+          {% for person in people %}
+            {% for proj in person.projects %}
+              {% if proj_colors.update({proj.name: proj.color}) %}{% endif %}
+            {% endfor %}
+          {% endfor %}
+          {% for proj_name in sorted_projects %}
+          <th>
+            <span class="alloc-proj-dot" style="background: {{ proj_colors.get(proj_name, '#64748b') }};"></span>
+            {{ proj_name }}
+          </th>
+          {% endfor %}
+          <th>Total</th>
+          <th>Billable</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for person in people %}
+        <tr>
+          <td class="alloc-name-col">
+            <strong>{{ person.name }}</strong>
+          </td>
+          {% set person_proj_map = {} %}
+          {% for proj in person.projects %}
+            {% if person_proj_map.update({proj.name: proj.hours}) %}{% endif %}
+          {% endfor %}
+          {% for proj_name in sorted_projects %}
+          <td class="alloc-cell {% if person_proj_map.get(proj_name, 0) == 0 %}alloc-zero{% endif %}">
+            {% if person_proj_map.get(proj_name, 0) > 0 %}
+              {{ person_proj_map.get(proj_name, 0) }}h
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          {% endfor %}
+          <td class="alloc-cell alloc-total"><strong>{{ person.total_hours }}h</strong></td>
+          <td class="alloc-cell billable-pct-{% if person.billable_pct >= 80 %}good{% elif person.billable_pct >= 60 %}ok{% else %}low{% endif %}">
+            <strong>{{ person.billable_pct }}%</strong>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{# ---- People Cards ---- #}
+<div class="people-grid" data-panel-id="people-cards">
+    {% for person in people %}
+    <div class="person-card person-card-collapsible" data-person-id="person-{{ loop.index }}">
+      {# Header with avatar and totals — always visible #}
+      <div class="person-header person-card-toggle">
+        <div class="person-identity">
+          {% if person.avatar %}
+          <img src="{{ person.avatar }}" alt="{{ person.name }}" class="person-avatar">
+          {% else %}
+          <div class="person-avatar person-avatar-placeholder" style="background: {{ person.color }};">
+            {{ person.name[0] }}
+          </div>
+          {% endif %}
+          <div>
+            <h3 class="person-name">{{ person.name }}</h3>
+            <span class="person-meta">{{ person.entry_count }} entries &middot; {{ person.projects | length }} project{{ 's' if person.projects | length != 1 }}</span>
+          </div>
+        </div>
+        <div class="person-total">
+          <span class="person-hours">{{ person.total_hours }}h</span>
+          <span class="person-billable-row">
+            <span class="person-billable-label">{{ person.billable_hours }}h billable</span>
+            <span class="person-billable-pct billable-pct-{% if person.billable_pct >= 80 %}good{% elif person.billable_pct >= 60 %}ok{% else %}low{% endif %}">{{ person.billable_pct }}%</span>
+          </span>
+        </div>
+        <svg class="person-collapse-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      {# Billable bar — always visible #}
+      <div class="billable-bar-section">
+        <div class="billable-bar-track">
+          <div class="billable-bar-fill billable-fill-{% if person.billable_pct >= 80 %}good{% elif person.billable_pct >= 60 %}ok{% else %}low{% endif %}" style="width: {{ person.billable_pct }}%;"></div>
+        </div>
+      </div>
+
+      {# Collapsible detail content #}
+      <div class="person-card-detail">
+        {# Project breakdown bars #}
+        <div class="person-projects">
+          {% for proj in person.projects %}
+          <div class="person-proj-row">
+            <div class="person-proj-label">
+              <span class="person-proj-dot" style="background: {{ proj.color }};"></span>
+              <span class="person-proj-name">{{ proj.name }}</span>
+            </div>
+            <div class="person-proj-bar-track">
+              <div class="person-proj-bar-fill" style="width: {{ proj.pct }}%; background: {{ proj.color }};"></div>
+            </div>
+            <span class="person-proj-hours">{{ proj.hours }}h</span>
+            <span class="person-proj-pct">{{ proj.pct }}%</span>
+            {% if proj.maintenance_pct > 0 or proj.professional_pct > 0 %}
+            <span class="person-proj-wt">
+              {% if proj.maintenance_pct > 0 %}<span class="wt-micro wt-micro-maintenance" data-tip="Maintenance {{ proj.maintenance_pct }}%">M{{ proj.maintenance_pct }}</span>{% endif %}
+              {% if proj.professional_pct > 0 %}<span class="wt-micro wt-micro-professional" data-tip="Professional {{ proj.professional_pct }}%">P{{ proj.professional_pct }}</span>{% endif %}
+            </span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
+        {# Daily activity sparkline (CSS-based) #}
+        {% if person.daily %}
+        <div class="person-daily">
+          <span class="person-daily-label">Daily Activity</span>
+          <div class="sparkline">
+            {% set max_daily = person.daily | map(attribute='hours') | max %}
+            {% for day in person.daily %}
+            <div class="spark-bar-wrapper" data-tip="{{ day.date }}  {{ day.hours }}h">
+              <div class="spark-bar" style="height: {{ (day.hours / max_daily * 100) if max_daily > 0 else 0 }}%; background: {{ person.color }};"></div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {# Tags #}
+        {% if person.top_tags %}
+        <div class="person-tags">
+          {% for t in person.top_tags %}
+          <span class="tag-pill">{{ t.tag }} <span class="tag-count">{{ t.count }}</span></span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+</div>
+
+</div>{# end .sortable-panels #}
+
+<style>
+.collapsible-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.collapsible-toggle .section-meta {
+  margin-left: auto;
+}
+.collapse-chevron {
+  margin-left: 0.75rem;
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.collapsible-toggle:hover .collapse-chevron {
+  opacity: 1;
+}
+.collapsible-section.collapsed .collapse-chevron {
+  transform: rotate(-90deg);
+}
+.collapsible-section.collapsed > *:not(.section-header) {
+  display: none;
+}
+.alloc-unbillable {
+  background: rgba(168, 85, 247, 0.08);
+  border-right: 2px solid rgba(168, 85, 247, 0.25);
+  color: var(--on-surface-variant, #aaa);
+  font-style: italic;
+}
+th.alloc-unbillable {
+  font-style: normal;
+  opacity: 0.75;
+}
+.person-card-toggle {
+  cursor: pointer;
+  position: relative;
+}
+.person-card-collapsible .person-total {
+  padding-right: 1.5rem;
+}
+.person-collapse-chevron {
+  position: absolute;
+  top: 0.5rem;
+  right: 0;
+  opacity: 0.6;
+  transition: transform 0.2s ease, opacity 0.15s ease;
+}
+.person-card-toggle:hover .person-collapse-chevron {
+  opacity: 1;
+}
+.person-card-collapsible.person-collapsed .person-collapse-chevron {
+  transform: rotate(-90deg);
+}
+.person-card-collapsible.person-collapsed .person-card-detail {
+  display: none;
+}
+</style>
+
+{# Tooltip handled globally by base.html #}
+
+<script>
+(function() {
+  var STORAGE_KEY = 'people-collapsed-sections';
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  var state = loadState();
+  document.querySelectorAll('.collapsible-section').forEach(function(section) {
+    var id = section.getAttribute('data-collapse-id');
+    var toggle = section.querySelector('.collapsible-toggle');
+    if (!id || !toggle) return;
+    if (state[id]) section.classList.add('collapsed');
+    toggle.addEventListener('click', function() {
+      var isCollapsed = section.classList.toggle('collapsed');
+      state[id] = isCollapsed;
+      saveState(state);
+    });
+  });
+
+  // Person card collapse
+  document.querySelectorAll('.person-card-collapsible').forEach(function(card) {
+    var id = card.getAttribute('data-person-id');
+    var toggle = card.querySelector('.person-card-toggle');
+    if (!id || !toggle) return;
+    if (state[id]) card.classList.add('person-collapsed');
+    toggle.addEventListener('click', function() {
+      var isCollapsed = card.classList.toggle('person-collapsed');
+      state[id] = isCollapsed;
+      saveState(state);
+    });
+  });
+})();
+</script>
+{% endblock %}
