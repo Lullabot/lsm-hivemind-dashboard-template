@@ -9,6 +9,22 @@
   </div>
 </div>
 
+{% if is_example_config %}
+{% set hint_id = "welcome-example" %}
+{% set hint_title = "You're looking at example data" %}
+{% set hint_body %}<p>This dashboard is running on the seeded <code>ProjectAlpha</code>, <code>ProjectBeta</code>, and <code>Internal</code> projects from the template. Edit <code>config/projects.yml</code> to swap in your own work, then refresh.</p><p>Use the prompt below with Claude Code (or any AI coding agent) to replace the example projects in one shot.</p>{% endset %}
+{% set hint_prompt %}Replace the example projects in config/projects.yml with my real projects.
+For each project I'll give you a name. Pick a distinct hex color and add a `github` field if I mention a repo, otherwise leave it out.
+Then update memory-bank/dashboard.md so the project status table lists my projects instead of ProjectAlpha/ProjectBeta/Internal, with a realistic status and one-line summary for each.
+Finally, delete the agents/ProjectAlpha, agents/ProjectBeta, agents/Internal directories and create new agents/<MyProjectName>/ directories with an empty CLAUDE.md in each.
+
+My projects are:
+- <NAME> (<optional repo>)
+- <NAME>{% endset %}
+{% set hint_doc = "docs/SETUP.md" %}
+{% include "_empty_hint.html" %}
+{% endif %}
+
 {# ---- Stats Row ---- #}
 <div class="stats-row">
   <div class="stat-card">

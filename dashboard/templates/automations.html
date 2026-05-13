@@ -14,6 +14,25 @@
 {% set weekly_count = automations | selectattr("frequency", "equalto", "weekly") | list | length %}
 {% set service_count = automations | selectattr("frequency", "equalto", "service") | list | length %}
 {% set active_count = automations | selectattr("running") | list | length %}
+
+{% if active_count == 0 %}
+{% set hint_id = "automations-empty" %}
+{% set hint_title = "No automations are running" %}
+{% set hint_body %}<p>This page reads <code>launchctl list</code> and matches it against the job definitions in <code>dashboard/data.py</code> (see <code>get_automations()</code>). None of the expected <code>com.pmdashboard.*</code> plists are loaded on this machine.</p><p>That's expected on a fresh checkout — the template ships without any scheduled jobs. The most useful one to wire up first is the morning briefing.</p>{% endset %}
+{% set hint_prompt %}Set up macOS launchd to run my dashboard automations.
+
+For each entry in dashboard/data.py's get_automations() list (Morning Briefing, Retrospector, Memory Consolidator, Dashboard Web Server):
+1. Generate a .plist file at ~/Library/LaunchAgents/<label>.plist matching the schedule and script path in get_automations().
+2. Use ProgramArguments pointing at the absolute path of the script in this repo.
+3. Set StandardOutPath and StandardErrorPath to the log paths listed in each job.
+4. For "Always running" jobs, include KeepAlive=true; for scheduled jobs, use StartCalendarInterval.
+5. After creating each plist, run `launchctl load ~/Library/LaunchAgents/<label>.plist`.
+6. Verify with `launchctl list | grep pmdashboard`.
+
+Only generate plists for the scripts that actually exist in my repo. Skip jobs whose script path doesn't resolve.{% endset %}
+{% set hint_doc = "dashboard/data.py → get_automations()" %}
+{% include "_empty_hint.html" %}
+{% endif %}
 <div class="stats-row">
   <div class="stat-card">
     <div class="stat-label">Total Jobs</div>

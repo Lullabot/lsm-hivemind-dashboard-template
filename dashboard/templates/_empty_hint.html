@@ -1,0 +1,29 @@
+{# Reusable inline hint card.
+
+Args (passed via include with-context or as a macro):
+  hint_title: short headline
+  hint_body:  HTML/text for the explanation paragraph
+  hint_prompt: the AI prompt to copy (rendered inside a <pre>)
+  hint_doc: optional path inside the repo to read for more context
+  hint_id: unique id used as a dismiss key
+#}
+<aside class="empty-hint" data-hint-id="{{ hint_id }}">
+  <div class="empty-hint-icon" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+  </div>
+  <div class="empty-hint-body">
+    <h3 class="empty-hint-title">{{ hint_title }}</h3>
+    <div class="empty-hint-text">{{ hint_body | safe }}</div>
+    {% if hint_prompt %}
+    <details class="empty-hint-prompt-wrap" open>
+      <summary>Copy &amp; paste this into your AI agent</summary>
+      <div class="empty-hint-prompt">
+        <button type="button" class="empty-hint-copy" data-copy-target="hint-prompt-{{ hint_id }}">Copy</button>
+        <pre id="hint-prompt-{{ hint_id }}">{{ hint_prompt }}</pre>
+      </div>
+    </details>
+    {% endif %}
+    {% if hint_doc %}<p class="empty-hint-doc">More: <code>{{ hint_doc }}</code></p>{% endif %}
+  </div>
+  <button type="button" class="empty-hint-dismiss" data-hint-dismiss="{{ hint_id }}" title="Hide this hint">×</button>
+</aside>
