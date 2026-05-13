@@ -5,6 +5,8 @@ across multiple client projects. The dashboard reads plain markdown and JSON
 files your agents (or you) produce, then renders project status, morning
 briefings, team activity, stuck PRs, and a self-improvement retrospector.
 
+![Dashboard tour — dashboard, briefing, people, retrospector, automations](docs/images/demo.gif)
+
 This is a **template repo**, not a turnkey product. Fork it, edit
 `config/projects.yml`, point your own agents at the file layout, and shape it
 to your workflow. Most PMs will not have the same upstream integrations, so
