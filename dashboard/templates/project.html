@@ -2,6 +2,28 @@
 {% block title %}{{ slug }} — PM Dashboard{% endblock %}
 {% block content %}
 
+{# Compute prev/next project for arrow-key + edge-indicator navigation #}
+{% set ns = namespace(idx=-1) %}
+{% for p in dashboard.projects %}{% if p.name == slug %}{% set ns.idx = loop.index0 %}{% endif %}{% endfor %}
+{% set total = dashboard.projects | length %}
+{% set prev_p = dashboard.projects[(ns.idx - 1) % total] if total > 1 else none %}
+{% set next_p = dashboard.projects[(ns.idx + 1) % total] if total > 1 else none %}
+
+{% if prev_p %}
+<a href="/project/{{ prev_p.name }}" class="project-edge-nav project-edge-prev" data-nav-dir="left" title="← {{ prev_p.name }}">
+  <span class="project-edge-arrow">‹</span>
+  <span class="project-edge-label">{{ prev_p.name }}</span>
+  <span class="project-edge-dot" style="background: {{ prev_p.color }};"></span>
+</a>
+{% endif %}
+{% if next_p %}
+<a href="/project/{{ next_p.name }}" class="project-edge-nav project-edge-next" data-nav-dir="right" title="{{ next_p.name }} →">
+  <span class="project-edge-arrow">›</span>
+  <span class="project-edge-label">{{ next_p.name }}</span>
+  <span class="project-edge-dot" style="background: {{ next_p.color }};"></span>
+</a>
+{% endif %}
+
 <div class="breadcrumb">
   <a href="{{ url_for('dashboard') }}">Dashboard</a> &rsaquo;
   <div class="project-switcher-wrap" id="project-switcher">
@@ -278,6 +300,65 @@
   });
   document.addEventListener('click', function() {
     wrap.classList.remove('open');
+  });
+})();
+
+// Arrow key navigation between projects, with slide animation
+(function() {
+  var items = Array.prototype.slice.call(
+    document.querySelectorAll('#project-switcher-menu .project-switcher-item')
+  );
+  var main = document.querySelector('.main-content');
+
+  // Slide-in on load if we just navigated via arrow
+  var incoming = sessionStorage.getItem('project-nav-dir');
+  if (incoming && main) {
+    sessionStorage.removeItem('project-nav-dir');
+    var inClass = incoming === 'right' ? 'page-turn-in-left' : 'page-turn-in-right';
+    main.classList.add('page-turning', inClass);
+    main.addEventListener('animationend', function onEnd() {
+      main.classList.remove('page-turning', inClass);
+      main.removeEventListener('animationend', onEnd);
+    });
+  }
+
+  if (items.length < 2) return;
+  var urls = items.map(function(a) { return a.getAttribute('href'); });
+  var currentIdx = items.findIndex(function(a) { return a.classList.contains('active'); });
+  if (currentIdx < 0) return;
+  var navigating = false;
+
+  function navigate(dir) {
+    if (navigating) return;
+    navigating = true;
+    var delta = dir === 'right' ? 1 : -1;
+    var next = (currentIdx + delta + urls.length) % urls.length;
+    sessionStorage.setItem('project-nav-dir', dir);
+    if (main) {
+      var outClass = dir === 'right' ? 'page-turn-out-left' : 'page-turn-out-right';
+      main.classList.add('page-turning', outClass);
+      setTimeout(function() { window.location.href = urls[next]; }, 220);
+    } else {
+      window.location.href = urls[next];
+    }
+  }
+
+  // Edge indicators trigger the same animated nav
+  document.querySelectorAll('.project-edge-nav').forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      navigate(a.dataset.navDir);
+    });
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (navigating) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    navigate(e.key === 'ArrowRight' ? 'right' : 'left');
   });
 })();
 
