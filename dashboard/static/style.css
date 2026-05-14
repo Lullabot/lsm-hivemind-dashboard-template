@@ -280,6 +280,76 @@ header h1 a { color: var(--on-surface); text-decoration: none; }
   padding-bottom: 3rem;
 }
 
+/* ---- Edge indicators for prev/next project (vertical, bottom corners) ---- */
+.project-edge-nav {
+  position: fixed;
+  bottom: 1.5rem;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+  background: var(--surface, rgba(20, 20, 22, 0.85));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  text-decoration: none;
+  z-index: 40;
+  opacity: 0.6;
+  transition: opacity 120ms ease, color 120ms ease, transform 120ms ease;
+  backdrop-filter: blur(6px);
+}
+.project-edge-nav:hover {
+  opacity: 1;
+  color: var(--on-surface, #fff);
+  transform: translateY(-2px);
+}
+/* Tucked past the sidebar (200px expanded, 76px collapsed). */
+.project-edge-prev { left: 212px; }
+.app-layout:has(.sidebar.collapsed) .project-edge-prev { left: 88px; }
+.project-edge-next { right: 0.75rem; }
+.project-edge-arrow {
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0.75;
+}
+.project-edge-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.project-edge-next .project-edge-label { transform: rotate(0deg); }
+.project-edge-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+@media (max-width: 720px) {
+  .project-edge-nav { display: none; }
+}
+
+/* ---- Page slide transitions (project arrow-key nav) ---- */
+.main-content.page-turning { will-change: transform; overflow: hidden; }
+@keyframes pageSlideOutLeft  { from { transform: translateX(0); }       to { transform: translateX(-100%); } }
+@keyframes pageSlideOutRight { from { transform: translateX(0); }       to { transform: translateX(100%); } }
+@keyframes pageSlideInLeft   { from { transform: translateX(100%); }    to { transform: translateX(0); } }
+@keyframes pageSlideInRight  { from { transform: translateX(-100%); }   to { transform: translateX(0); } }
+.main-content.page-turn-out-left  { animation: pageSlideOutLeft  220ms ease-in  forwards; }
+.main-content.page-turn-out-right { animation: pageSlideOutRight 220ms ease-in  forwards; }
+.main-content.page-turn-in-left   { animation: pageSlideInLeft   260ms ease-out both; }
+.main-content.page-turn-in-right  { animation: pageSlideInRight  260ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .main-content.page-turn-out-left,
+  .main-content.page-turn-out-right,
+  .main-content.page-turn-in-left,
+  .main-content.page-turn-in-right { animation: none; }
+}
+
 /* ---- Stats Row ---- */
 .stats-row {
   display: grid;
