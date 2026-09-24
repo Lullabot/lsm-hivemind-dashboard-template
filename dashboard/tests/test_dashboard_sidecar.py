@@ -76,3 +76,23 @@ def test_sidecar_without_markdown(memory_bank):
     assert result["source"] == "json"
     assert result["details"] == {}
     assert len(result["projects"]) == 2
+
+
+def test_archived_projects_dropped_from_sidecar(memory_bank, monkeypatch):
+    import data
+    monkeypatch.setattr(data, "ARCHIVED_PROJECTS", {"ProjectBeta"})
+    _write(memory_bank, {**SIDECAR, "priorities": SIDECAR["priorities"] + [{"project": "ProjectBeta", "text": "old"}]})
+    result = parse_dashboard()
+    assert result["source"] == "json"
+    assert [p["name"] for p in result["projects"]] == ["ProjectAlpha"]
+    assert all(p["project"] != "ProjectBeta" for p in result["priorities"])
+    assert "ProjectBeta" not in result["details"]
+
+
+def test_archived_projects_dropped_from_markdown(memory_bank, monkeypatch):
+    import data
+    monkeypatch.setattr(data, "ARCHIVED_PROJECTS", {"ProjectAlpha"})
+    result = parse_dashboard()
+    assert result["source"] == "markdown"
+    assert "ProjectAlpha" not in [p["name"] for p in result["projects"]]
+    assert "ProjectAlpha" not in result["details"]

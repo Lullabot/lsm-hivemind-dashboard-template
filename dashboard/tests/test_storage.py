@@ -81,3 +81,30 @@ def test_save_memory_bank_file_whitelist(memory_bank):
     assert (memory_bank / "weekly-report.md").read_text() == "hello"
     with pytest.raises(ValueError):
         data.save_memory_bank_file("../escape.md", "nope")
+
+
+def test_atomic_write_fsyncs_the_directory(tmp_path, monkeypatch):
+    import os
+    import storage
+    synced = []
+    real_fsync = os.fsync
+    monkeypatch.setattr(storage.os, "fsync", lambda fd: (synced.append(fd), real_fsync(fd)))
+    atomic_write_text(tmp_path / "f.txt", "x")
+    assert len(synced) == 2  # the temp file, then its directory
+
+
+def test_directory_fsync_failure_does_not_fail_the_write(tmp_path, monkeypatch):
+    import os
+    import storage
+    calls = []
+    real_fsync = os.fsync
+
+    def fsync(fd):
+        calls.append(fd)
+        if len(calls) > 1:  # the directory fsync
+            raise OSError("directory fsync not supported")
+        real_fsync(fd)
+
+    monkeypatch.setattr(storage.os, "fsync", fsync)
+    atomic_write_text(tmp_path / "f.txt", "x")
+    assert (tmp_path / "f.txt").read_text() == "x"
