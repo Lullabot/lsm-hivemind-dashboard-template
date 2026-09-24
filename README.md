@@ -46,7 +46,7 @@ own projects.
 
 - `docs/SETUP.md` — full configuration walkthrough.
 - `docs/INTEGRATIONS.md` — how to wire up Noko, GitHub, or your own data sources, and the `dashboard.json` sidecar shape.
-- `docs/KENKEEP.md` — adding a kenkeep knowledge base and the memory map.
+- `docs/KENKEEP.md` — setting up a kenkeep knowledge base with your agent, including a prompt to paste and how to check the result.
 
 ## License
 

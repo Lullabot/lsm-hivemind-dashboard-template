@@ -6,28 +6,60 @@ For a PM setup this replaces the pile of feedback files and CLAUDE.md appendices
 
 The dashboard's `/memory-map` page draws that knowledge base as a graph.
 
-## Install
+## Setting it up with your agent
 
-Pin a version and use the same one everywhere. The CLI, the hook scripts it installs, and the curation prompts move together, so mixing versions breaks capture or curation quietly.
+kenkeep is a separate project, so this template doesn't install it for you. The expected path is that you ask your coding agent (Claude Code) to do it. This section is what you need to know to direct it and to check its work.
 
-```bash
-# From the repo root. Replace 1.16.1 with the version you pin.
-npx kenkeep@1.16.1 init --harnesses claude
+### Before you start
+
+- Node.js 22 or later (kenkeep 1.16.1 requires it), so `npx` works. Check with `node --version`.
+- Claude Code, started from the root of your fork. The knowledge base lands in whichever git repository the session starts in, so where you start the session matters.
+- A version to pin. Check the [kenkeep releases](https://github.com/e0ipso/kenkeep/releases) and pick one. The examples below use `1.16.1`.
+
+### What to ask for
+
+Paste this into a Claude Code session started at the root of your fork, with your version filled in:
+
+```text
+Install kenkeep <version> in this repo by following docs/KENKEEP.md.
+Pin that exact version: write it to .kenkeep-version and never use @latest.
+Run init for the claude harness, then run doctor and show me the output.
+Confirm .ai/kenkeep/.gitignore excludes _sessions/, _logs/ and hooks/
+before staging anything. Don't install it anywhere under agents/*/code/.
+Don't commit; show me git status when you're done.
 ```
 
-Record the pinned version in one place that both humans and the nightly retrospector read, and never run `npx kenkeep@latest`. To upgrade, bump the pin and re-run `init --upgrade` in the same commit.
+When that's reviewed and committed, start a new session so the hooks load, then run `/kk-bootstrap` to seed the knowledge base from your existing docs. Bootstrap writes nodes straight to disk. Read them, delete the ones you disagree with, and commit the rest.
+
+### What the agent should do
+
+These are the steps the prompt above asks for, so you can tell whether the agent followed them:
+
+1. `echo 1.16.1 > .kenkeep-version`. This is the one place the version lives. Anything that runs kenkeep (you, the agent, a nightly job) reads it from here.
+2. `npx kenkeep@$(cat .kenkeep-version) init --harnesses claude` from the repo root.
+3. `npx kenkeep@$(cat .kenkeep-version) doctor`, which should report no errors.
+4. Check `.ai/kenkeep/.gitignore` against the table under "What to commit" below.
+
+### Checking it worked
+
+- `.claude/settings.json` has new `Stop`, `SessionEnd`, `PreCompact`, `SessionStart` and `UserPromptSubmit` hooks that point at `.ai/kenkeep/hooks/claude/`.
+- After you finish one ordinary session, a transcript appears under `.ai/kenkeep/_sessions/`, and `git status` doesn't show it.
+- In the next session, your prompts come back with a short list of relevant nodes attached. You'll see it in the transcript as hook context.
+- `/memory-map` shows your nodes instead of the example set.
+
+### Rules to give your agent
+
+- **Never use `@latest`.** The CLI, the hook scripts and the curation prompts have to match. A mismatch breaks capture or curation without an error you'd notice.
+- **Never install inside a client's code checkout** (anything under `agents/*/code/`). kenkeep writes to the nearest git repository above the session's working directory, so a session started inside a client repo puts transcripts one `git add` away from that client's history. Do codebase work from a session started in the workspace instead.
+- **Upgrade in one commit.** Bump `.kenkeep-version`, re-run `init --upgrade`, run `doctor`, and commit all of it together.
+
+### What `init` does
 
 `init` does three things:
 
 1. Creates `.ai/kenkeep/` with `config.yaml`, prompts, and an empty `nodes/` tree.
 2. Registers hooks in `.claude/settings.json` (session capture on Stop, SessionEnd and PreCompact; proposal drain on SessionStart; a UserPromptSubmit hook that injects the nodes most relevant to each prompt).
 3. Installs the `/kk-add`, `/kk-curate`, `/kk-bootstrap`, `/kk-migrate` and `/kk-session-extract` skills.
-
-Then seed the knowledge base from your existing docs:
-
-```text
-/kk-bootstrap
-```
 
 ## What to commit
 
@@ -69,4 +101,4 @@ With no store installed the page shows the example knowledge base in `examples/k
 
 ## Nightly curation
 
-Curation can run in-session (`/kk-curate`) or on a schedule. The template does not ship a scheduler. If you add a nightly job, have it run curation with the pinned version, append one JSON line per run to `dashboard/data/kenkeep-curation-history.jsonl` (the memory map's curation strip reads it), soft-fail so a kenkeep problem never blocks your other nightly work, and leave new nodes uncommitted for review the next morning.
+Curation can run in-session (`/kk-curate`) or on a schedule. The template does not ship a scheduler. If you add a nightly job, have it run curation with the version in `.kenkeep-version`, append one JSON line per run to `dashboard/data/kenkeep-curation-history.jsonl` (the memory map's curation strip reads it), soft-fail so a kenkeep problem never blocks your other nightly work, and leave new nodes uncommitted for review the next morning.
