@@ -39,6 +39,27 @@ def locked(path):
         yield
 
 
+def _fsync_dir(directory):
+    """Flush a directory entry so a completed rename survives power loss.
+
+    Best-effort: platforms without O_DIRECTORY (Windows) or filesystems that
+    refuse to fsync a directory are skipped rather than failing the write.
+    """
+    flag = getattr(os, "O_DIRECTORY", None)
+    if flag is None:
+        return
+    try:
+        fd = os.open(directory, os.O_RDONLY | flag)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def atomic_write_text(path, text):
     """Replace ``path`` with ``text`` atomically, keeping its permissions.
 
@@ -65,6 +86,7 @@ def atomic_write_text(path, text):
         except FileNotFoundError:
             pass
         raise
+    _fsync_dir(target.parent)
 
 
 def atomic_write_json(path, data, **dump_kwargs):

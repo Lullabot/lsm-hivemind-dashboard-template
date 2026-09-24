@@ -26,6 +26,7 @@ NOKO_DIR_TO_PROJECT = _CFG["noko_dir_to_project"]
 PERSON_COLORS = _CFG["person_colors"] or ["#64748b"]
 PROJECT_GITHUB_REPOS = _CFG["project_github"]
 CLIENT_PROJECTS = _CFG["client_projects"]
+ARCHIVED_PROJECTS = set(_CFG["archived_projects"])
 DEFAULT_COLOR = "#64748b"
 
 # Names that ship with the template. If the live config still uses these,
@@ -136,6 +137,21 @@ def load_dashboard_sidecar():
 
 
 def parse_dashboard():
+    """Parse the dashboard, dropping projects archived in config/projects.yml.
+
+    Upstream writers (an agent, a script) may not know a project was archived,
+    so the filter applies to both the sidecar and the markdown, and to the
+    status table, priorities, and per-project details alike.
+    """
+    result = _parse_dashboard_unfiltered()
+    if ARCHIVED_PROJECTS:
+        result["projects"] = [p for p in result["projects"] if p["name"] not in ARCHIVED_PROJECTS]
+        result["priorities"] = [p for p in result["priorities"] if p.get("project") not in ARCHIVED_PROJECTS]
+        result["details"] = {k: v for k, v in result["details"].items() if k not in ARCHIVED_PROJECTS}
+    return result
+
+
+def _parse_dashboard_unfiltered():
     """Parse memory-bank/dashboard.md into structured data.
 
     Prefers the structured sidecar (dashboard.json) for the status table,
