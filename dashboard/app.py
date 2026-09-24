@@ -10,7 +10,7 @@ from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from kenkeep_data import get_memory_map
+from kenkeep_data import get_memory_map, kenkeep_sources
 from data import _is_my_action, get_all_data, get_all_open_actions, get_health, list_retrospector_dates, load_actions_status, parse_claude_md_escalations, parse_retrospector, parse_consolidation_log, parse_escalation_log, parse_hook_enforcements, parse_meeting_notes, parse_checklists, save_memory_bank_file, toggle_action_dismissed
 from storage import CorruptStateError
 
@@ -137,6 +137,7 @@ async def memory_map(request):
     return templates.TemplateResponse(request, "memory-map.html", context={
         **get_all_data(),
         "asset_version": asset_version,
+        "kenkeep_example": any(s.get("example") for s in kenkeep_sources()),
     })
 
 

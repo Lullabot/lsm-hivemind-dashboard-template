@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Memory Map — PM Dashboard{% endblock %}
 {% block content %}
+{% if kenkeep_example %}
+{% set hint_id = "memory-map-example" %}
+{% set hint_title = "This map shows example knowledge" %}
+{% set hint_body %}<p>The memory map draws a <a href="https://github.com/e0ipso/kenkeep">kenkeep</a> knowledge base: short notes about conventions, gotchas and decisions that kenkeep curates from your Claude Code sessions and feeds back into future ones. Each dot is a note, lines are relationships between notes, and colors are the projects in <code>config/projects.yml</code>.</p><p>No knowledge base is installed in this repo yet, so you're looking at the example set in <code>examples/kenkeep/</code>. kenkeep is a separate project; ask your agent to install it with the prompt below, then review what it did before committing. Once that is committed, start a new session and run <code>/kk-bootstrap</code> to seed the knowledge base from your existing docs.</p>{% endset %}
+{% set hint_prompt %}Install kenkeep 1.16.1 in this repo by following docs/KENKEEP.md.
+Pin that exact version: write it to .kenkeep-version and never use @latest.
+Run init for the claude harness, then run doctor and show me the output.
+Confirm .ai/kenkeep/.gitignore excludes _sessions/, _logs/ and hooks/
+before staging anything. Don't install it anywhere under agents/*/code/.
+Don't commit; show me git status when you're done.{% endset %}
+{% set hint_doc = "docs/KENKEEP.md" %}
+{% include "_empty_hint.html" %}
+{% endif %}
 <div class="mm-page">
   <div class="mm-toolbar">
     <div class="mm-heading">
