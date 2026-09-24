@@ -1,0 +1,17 @@
+{
+  "updated": "2026-05-13",
+  "projects": [
+    {"name": "ProjectAlpha", "client": "Example Org", "type": "Active development", "status": "On track", "summary": "Sprint 4 in flight; design review Thursday."},
+    {"name": "ProjectBeta", "client": "Acme Inc", "type": "Stable", "status": "Stable", "summary": "Maintenance-only; one PR awaiting review."},
+    {"name": "Internal", "client": "—", "type": "Internal", "status": "Active", "summary": "Tooling improvements and template work."}
+  ],
+  "priorities": [
+    {"project": "ProjectAlpha", "text": "Land the search-relevance experiment before Friday's demo."},
+    {"project": "ProjectBeta", "text": "Review and merge PR #142 to unblock the analytics rollout."},
+    {"project": "Internal", "text": "Document the new onboarding flow."}
+  ],
+  "themes": [
+    {"title": "Accessibility audits", "detail": "both client projects have WCAG 2.1 AA audits scheduled for Q3."},
+    {"title": "Release cadence", "detail": "moving from monthly to bi-weekly releases starting next sprint."}
+  ]
+}

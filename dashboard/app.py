@@ -1,7 +1,7 @@
 """PM Dashboard — Starlette web app for multi-project PM coordination."""
 
+import asyncio
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 
 from starlette.applications import Starlette
@@ -10,7 +10,9 @@ from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from data import _is_my_action, get_all_data, get_all_open_actions, get_health, list_retrospector_dates, load_actions_status, parse_claude_md_escalations, parse_retrospector, parse_consolidation_log, parse_escalation_log, parse_hook_enforcements, parse_meeting_notes, parse_checklists, save_actions_status
+from kenkeep_data import get_memory_map, kenkeep_sources
+from data import _is_my_action, get_all_data, get_all_open_actions, get_health, list_retrospector_dates, load_actions_status, parse_claude_md_escalations, parse_retrospector, parse_consolidation_log, parse_escalation_log, parse_hook_enforcements, parse_meeting_notes, parse_checklists, save_memory_bank_file, toggle_action_dismissed
+from storage import CorruptStateError
 
 MEMORY_BANK = Path(__file__).resolve().parent.parent / "memory-bank"
 
@@ -125,6 +127,25 @@ async def memory_content(request):
     return PlainTextResponse(body.strip())
 
 
+async def memory_map(request):
+    """Interactive force-directed view of the kenkeep knowledge base."""
+    js_path = BASE_DIR / "static" / "memory-map.js"
+    try:
+        asset_version = str(int(js_path.stat().st_mtime))
+    except OSError:
+        asset_version = "0"
+    return templates.TemplateResponse(request, "memory-map.html", context={
+        **get_all_data(),
+        "asset_version": asset_version,
+        "kenkeep_example": any(s.get("example") for s in kenkeep_sources()),
+    })
+
+
+async def api_memory_map(request):
+    """kenkeep graph (nodes + links), pending conflicts, and curation history."""
+    return JSONResponse(await asyncio.to_thread(get_memory_map))
+
+
 async def health(request):
     """System health check — data source freshness and uptime."""
     data = get_health()
@@ -177,6 +198,19 @@ API_ENDPOINTS = [
         ],
         "example_response": "Use the pre-computed agent field from each failure object.\n"
                             "This is pre-computed from the session directory path...",
+    },
+    {
+        "method": "GET",
+        "path": "/api/memory-map",
+        "description": "kenkeep knowledge graph across every installed store (root, "
+                       "project workspaces, codebases): nodes, links, pending "
+                       "conflicts, and nightly curation history. Read-only.",
+        "category": "Memory",
+        "params": [],
+        "example_response": '{\n  "nodes": [ { "id": "L1:root:practice-...", "kind": "practice", ... } ],\n'
+                            '  "links": [ { "source": "...", "target": "...", "class": "relates" } ],\n'
+                            '  "stats": { "total": 12, "installed": true },\n'
+                            '  "review": { "conflicts": [] },\n  "curation": [...]\n}',
     },
     {
         "method": "GET",
@@ -239,8 +273,7 @@ async def api_geekbot_save(request):
     """Save edited geekbot standup content back to file."""
     body = await request.json()
     content = body.get("content", "")
-    path = MEMORY_BANK / "geekbot-standup.md"
-    path.write_text(content)
+    save_memory_bank_file("geekbot-standup.md", content)
     return JSONResponse({"ok": True})
 
 
@@ -248,8 +281,7 @@ async def api_weekly_save(request):
     """Save edited weekly report content back to file."""
     body = await request.json()
     content = body.get("content", "")
-    path = MEMORY_BANK / "weekly-report.md"
-    path.write_text(content)
+    save_memory_bank_file("weekly-report.md", content)
     return JSONResponse({"ok": True})
 
 
@@ -259,16 +291,10 @@ async def api_action_toggle(request):
     key = body.get("key", "")
     if not re.match(r"^[a-f0-9]{12}$", key):
         return JSONResponse({"error": "Invalid key"}, status_code=400)
-    status = load_actions_status()
-    if key in status:
-        del status[key]
-        dismissed = False
-    else:
-        status[key] = {
-            "dismissed_at": datetime.now(timezone.utc).isoformat(),
-        }
-        dismissed = True
-    save_actions_status(status)
+    try:
+        dismissed = toggle_action_dismissed(key)
+    except CorruptStateError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
     return JSONResponse({"ok": True, "dismissed": dismissed})
 
 
@@ -289,10 +315,12 @@ routes = [
     Route("/retrospector/{date}", retrospector_by_date, name="retrospector_date"),
     Route("/retrospector", retrospector, name="retrospector"),
     Route("/automations", automations, name="automations"),
+    Route("/memory-map", memory_map, name="memory_map"),
     Route("/project/{slug}", project_detail, name="project_detail"),
     Route("/api", api_explorer, name="api_explorer"),
     Route("/health", health, name="health"),
     Route("/api/data", export_json, name="export"),
+    Route("/api/memory-map", api_memory_map, name="api_memory_map"),
     Route("/api/memory/{filename}", memory_content, name="memory_content"),
     Route("/api/retrospector/{date}", api_retrospector_date, name="api_retrospector_date"),
     Route("/api/project/{slug}", api_project, name="api_project"),

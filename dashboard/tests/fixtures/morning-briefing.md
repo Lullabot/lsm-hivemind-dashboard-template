@@ -16,7 +16,7 @@ ProjectGamma      ███░░░░░░░  15.0h
 ## Needs Attention Today
 
 - **ProjectAlpha: Review SSO staging deployment.** Needs QA sign-off before go-live.
-- **ProjectBeta: Budget at 89%.** Coordinate with David on remaining scope.
+- **ProjectBeta: Budget at 89%.** Coordinate with the client on remaining scope.
 
 ## Open Questions Needing Response
 

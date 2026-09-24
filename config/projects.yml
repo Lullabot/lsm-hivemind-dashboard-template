@@ -1,29 +1,59 @@
-# Projects this dashboard tracks.
+# Projects this dashboard (and its automation scripts) track.
+#
+# This file is the single project roster. The dashboard reads it through
+# dashboard/config.py. Point any automation scripts you add at this same file
+# (PyYAML or yq both work) so adding, renaming, or archiving a project is one
+# edit; don't keep a second list anywhere else.
 #
 # Each entry is one project. Fields:
-#   name:        Display name (also the slug shown in URLs and dashboard tables).
+#   name:        Display name (also the slug shown in URLs and dashboard tables). Required.
 #   color:       Hex color used in charts and badges.
+#   status:      "active" (default) or "archived". Archived projects stay in this
+#                file for the record but drop out of every dashboard view and
+#                every automation loop. Optionally add archived_on: YYYY-MM-DD.
+#   category:    "client", "internal", or "bucket" (a non-client catch-all such as
+#                a practice or support pool). Optional. When omitted, falls back to
+#                the older `client` boolean below.
+#   client:      Boolean, kept for back-compat. If false the project is treated as
+#                internal/non-billable and excluded from billable-people aggregates.
+#                Ignored when `category` is set. Defaults to true.
 #   github:      "owner/repo" if you want the dashboard to pull PR staleness.
 #   noko_dir:    Subdirectory under agents/ where Noko time-entry JSON is dumped.
 #                Defaults to `name` if omitted.
 #   agent_dir:   Subdirectory under agents/ for meeting notes + checklists.
 #                Defaults to `name` if omitted.
-#   client:      Boolean. If false the project is treated as internal/non-billable
-#                and excluded from billable-people aggregates. Defaults to true.
+#   kenkeep_tag: Tag that marks this project's nodes in a kenkeep knowledge base
+#                (used to color them on the memory map). Optional.
+#
+# Scripts may read extra keys you add (calendar keywords, time-tracker IDs,
+# chat channels). Unknown keys are ignored by the dashboard.
 
 projects:
   - name: ProjectAlpha
     color: "#6366f1"   # indigo
+    status: active
+    category: client
     github: example-org/project-alpha
     noko_dir: ProjectAlpha
     agent_dir: ProjectAlpha
-    client: true
+    kenkeep_tag: project-alpha
 
   - name: ProjectBeta
     color: "#22c55e"   # green
+    status: active
+    category: client
     github: example-org/project-beta
-    client: true
+    kenkeep_tag: project-beta
 
   - name: Internal
     color: "#64748b"   # grey
-    client: false
+    status: active
+    category: internal
+
+  # Archived projects stay listed but are hidden everywhere.
+  - name: ProjectLegacy
+    color: "#a855f7"   # purple
+    status: archived
+    archived_on: 2026-04-30
+    category: client
+    github: example-org/project-legacy

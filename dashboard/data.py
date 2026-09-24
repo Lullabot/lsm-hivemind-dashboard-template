@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from config import load as load_config
+from storage import CorruptStateError, atomic_write_json, atomic_write_text, load_json_for_update, locked
 
 _CFG = load_config()
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +26,7 @@ NOKO_DIR_TO_PROJECT = _CFG["noko_dir_to_project"]
 PERSON_COLORS = _CFG["person_colors"] or ["#64748b"]
 PROJECT_GITHUB_REPOS = _CFG["project_github"]
 CLIENT_PROJECTS = _CFG["client_projects"]
+ARCHIVED_PROJECTS = set(_CFG["archived_projects"])
 DEFAULT_COLOR = "#64748b"
 
 # Names that ship with the template. If the live config still uses these,
@@ -57,11 +59,112 @@ STALE_CRIT_DAYS = _CFG["staleness"].get("crit_days", 7)
 STATUS_MAP = {k.lower(): v for k, v in _CFG["status_map"].items()}
 
 
+def _status_class(status_display):
+    return STATUS_MAP.get(status_display.strip().lower(), "unknown")
+
+
+def _normalize_themes(raw):
+    """Accept themes as {title, detail} dicts or plain strings."""
+    themes = []
+    for item in raw or []:
+        if isinstance(item, dict):
+            title = str(item.get("title", "")).strip()
+            detail = str(item.get("detail", "")).strip()
+            if title or detail:
+                themes.append({"title": title, "detail": detail})
+        elif isinstance(item, str) and item.strip():
+            themes.append({"title": "", "detail": item.strip()})
+    return themes
+
+
+def load_dashboard_sidecar():
+    """Read memory-bank/dashboard.json, the structured twin of dashboard.md.
+
+    Whatever writes dashboard.md (usually a morning-briefing agent) can write
+    this file alongside it. Reading JSON avoids re-deriving structure from
+    prose, where a changed emphasis marker or a reordered column silently drops
+    a project. Returns None when the sidecar is absent, invalid, empty, or
+    older than the markdown (a stale sidecar is worse than no sidecar).
+
+    Shape: {"updated": str, "projects": [{name, client, type, status, summary}],
+    "priorities": [{project, text}], "themes": [{title, detail}]}.
+    """
+    sidecar = MEMORY_BANK / "dashboard.json"
+    md = MEMORY_BANK / "dashboard.md"
+    if not sidecar.exists():
+        return None
+    try:
+        if md.exists() and sidecar.stat().st_mtime < md.stat().st_mtime - 60:
+            return None  # markdown regenerated without the sidecar; don't trust it
+        payload = json.loads(sidecar.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict) or not isinstance(payload.get("projects"), list):
+        return None
+
+    projects = []
+    for entry in payload["projects"]:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name", "")).strip()
+        if not name:
+            continue
+        status_display = str(entry.get("status", "")).strip("*").strip()
+        projects.append({
+            "name": name,
+            "client": str(entry.get("client") or name).strip(),
+            "type": str(entry.get("type", "")).strip(),
+            "status": status_display,
+            "status_class": _status_class(status_display),
+            "summary": str(entry.get("summary", "")).strip(),
+            "color": PROJECT_COLORS.get(name, DEFAULT_COLOR),
+        })
+    if not projects:
+        return None  # an empty roster means something went wrong upstream
+
+    priorities = [
+        {"project": str(p.get("project", "")).strip(), "text": str(p.get("text", "")).strip()}
+        for p in payload.get("priorities") or []
+        if isinstance(p, dict) and p.get("project")
+    ]
+
+    return {
+        "updated": str(payload.get("updated") or "Unknown"),
+        "projects": projects,
+        "priorities": priorities,
+        "themes": _normalize_themes(payload.get("themes")),
+    }
+
+
 def parse_dashboard():
-    """Parse memory-bank/dashboard.md into structured data."""
+    """Parse the dashboard, dropping projects archived in config/projects.yml.
+
+    Upstream writers (an agent, a script) may not know a project was archived,
+    so the filter applies to both the sidecar and the markdown, and to the
+    status table, priorities, and per-project details alike.
+    """
+    result = _parse_dashboard_unfiltered()
+    if ARCHIVED_PROJECTS:
+        result["projects"] = [p for p in result["projects"] if p["name"] not in ARCHIVED_PROJECTS]
+        result["priorities"] = [p for p in result["priorities"] if p.get("project") not in ARCHIVED_PROJECTS]
+        result["details"] = {k: v for k, v in result["details"].items() if k not in ARCHIVED_PROJECTS}
+    return result
+
+
+def _parse_dashboard_unfiltered():
+    """Parse memory-bank/dashboard.md into structured data.
+
+    Prefers the structured sidecar (dashboard.json) for the status table,
+    priorities, and themes when it is present, valid, and no older than the
+    markdown. Per-project detail sections always come from the markdown.
+    The result's ``source`` is "json" or "markdown".
+    """
+    sidecar = load_dashboard_sidecar()
     path = MEMORY_BANK / "dashboard.md"
     if not path.exists():
-        return {"updated": "Unknown", "projects": [], "themes": [], "priorities": []}
+        if sidecar:
+            return {**sidecar, "details": {}, "source": "json"}
+        return {"updated": "Unknown", "projects": [], "themes": [], "priorities": [], "details": {}, "source": "none"}
 
     text = path.read_text()
 
@@ -173,13 +276,18 @@ def parse_dashboard():
             "color": PROJECT_COLORS.get(name, "#64748b"),
         }
 
-    return {
+    result = {
         "updated": updated,
         "projects": projects,
         "themes": themes,
         "priorities": priorities,
         "details": details,
+        "source": "markdown",
     }
+    if sidecar:
+        result.update(sidecar)
+        result["source"] = "json"
+    return result
 
 
 def parse_briefing():
@@ -711,11 +819,10 @@ def refresh_staleness():
 
     data["stale_items"].sort(key=lambda x: x["idle_days"], reverse=True)
 
-    STALENESS_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    STALENESS_CACHE.write_text(json.dumps({
+    atomic_write_json(STALENESS_CACHE, {
         "fetched_at": now.isoformat(),
         "data": data,
-    }, indent=2))
+    }, indent=2)
 
     return data
 
@@ -1485,9 +1592,40 @@ def load_actions_status():
 
 
 def save_actions_status(data):
-    """Write dismissed action item keys to JSON sidecar."""
-    ACTIONS_STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    ACTIONS_STATUS_FILE.write_text(json.dumps(data, indent=2))
+    """Write dismissed action item keys to JSON sidecar (atomically)."""
+    atomic_write_json(ACTIONS_STATUS_FILE, data, indent=2)
+
+
+def toggle_action_dismissed(key):
+    """Flip one action item's dismissed state and return the new state.
+
+    Holds the per-file lock across the read-modify-write so two concurrent
+    toggles cannot both read the old file and drop each other's change. Raises
+    CorruptStateError rather than overwriting an unreadable status file.
+    """
+    with locked(ACTIONS_STATUS_FILE):
+        status = load_json_for_update(ACTIONS_STATUS_FILE, {})
+        if key in status:
+            del status[key]
+            dismissed = False
+        else:
+            status[key] = {"dismissed_at": datetime.now(timezone.utc).isoformat()}
+            dismissed = True
+        save_actions_status(status)
+    return dismissed
+
+
+# Memory-bank files the dashboard lets you edit in place.
+EDITABLE_MEMORY_BANK_FILES = {"geekbot-standup.md", "weekly-report.md"}
+
+
+def save_memory_bank_file(name, content):
+    """Atomically replace an editable memory-bank file with ``content``."""
+    if name not in EDITABLE_MEMORY_BANK_FILES:
+        raise ValueError(f"{name} is not an editable memory-bank file")
+    path = MEMORY_BANK / name
+    with locked(path):
+        atomic_write_text(path, content)
 
 
 # Owner aliases come from config/dashboard.yml. Empty list disables the

@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Memory Map — PM Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Memory Map</h2>
+    <p class="page-subtitle">Knowledge base curated by kenkeep from your Claude Code sessions</p>
+  </div>
+</div>
+
+{% if kenkeep_example %}
+{% set hint_id = "memory-map-example" %}
+{% set hint_title = "This map shows example knowledge" %}
+{% set hint_body %}<p>The memory map draws a <a href="https://github.com/e0ipso/kenkeep">kenkeep</a> knowledge base: short notes about conventions, gotchas and decisions that kenkeep curates from your Claude Code sessions and feeds back into future ones. Each dot is a note, lines are relationships between notes, and colors are the projects in <code>config/projects.yml</code>.</p><p>No knowledge base is installed in this repo yet, so you're looking at the example set in <code>examples/kenkeep/</code>. kenkeep is a separate project; ask your agent to install it with the prompt below, then review what it did before committing. Once that is committed, start a new session and run <code>/kk-bootstrap</code> to seed the knowledge base from your existing docs.</p>{% endset %}
+{% set hint_prompt %}Install kenkeep 1.16.1 in this repo by following docs/KENKEEP.md.
+Pin that exact version: write it to .kenkeep-version and never use @latest.
+Run init for the claude harness, then run doctor and show me the output.
+Confirm .ai/kenkeep/.gitignore excludes _sessions/, _logs/ and hooks/
+before staging anything. Don't install it anywhere under agents/*/code/.
+Don't commit; show me git status when you're done.{% endset %}
+{% set hint_doc = "docs/KENKEEP.md" %}
+{% include "_empty_hint.html" %}
+{% endif %}
+<div class="mm-page">
+  <div class="mm-toolbar">
+    <div class="mm-stats" id="mm-stats"></div>
+    <div class="mm-modes" role="group" aria-label="Layout">
+      <button type="button" class="mm-mode is-active" data-layout="force">Force</button>
+    </div>
+    <button type="button" id="mm-3d" class="mm-3d" aria-pressed="false" title="Toggle 3D space">3D</button>
+    <div class="mm-layers" role="group" aria-label="Toggle layers">
+      <button type="button" class="mm-layer is-active" data-layer="L1" aria-pressed="true" title="Root orchestration hub">Shared knowledge</button>
+      <button type="button" class="mm-layer is-active" data-layer="L2" aria-pressed="true" title="PM agent workspaces">Project workspaces</button>
+      <button type="button" class="mm-layer is-active" data-layer="L3" aria-pressed="true" title="Product codebases">Codebases</button>
+    </div>
+
+    <div class="mm-legend">
+      <span><span class="mm-dot" style="background:#818cf8"></span>map · what exists</span>
+      <span><span class="mm-dot" style="background:#f472b6"></span>practice · how we work</span>
+      <span class="mm-leg-cue">rings = layer depth (L1 none · L2 one · L3 two)</span>
+      <span class="mm-leg-lineage">lineage</span>
+      <span id="mm-proj-legend" class="mm-proj-legend"></span>
+    </div>
+  </div>
+
+  <p id="mm-example-note" class="mm-example-note" hidden>Showing the example knowledge base from <code>examples/kenkeep/</code>. Install kenkeep to map your own; see <code>docs/KENKEEP.md</code>.</p>
+
+  <section class="mm-review" aria-labelledby="mm-review-title">
+    <h2 id="mm-review-title">Needs attention</h2>
+    <div id="mm-review-content" aria-live="polite">Loading review sources…</div>
+  </section>
+  <p id="mm-view-note" role="status"></p>
+  <div class="mm-workspace">
+    <aside class="mm-browser" aria-label="Knowledge search">
+      <label for="mm-filter">Find knowledge</label>
+      <input id="mm-filter" class="mm-filter" type="search" placeholder="Search titles, summaries or #tags" autocomplete="off">
+      <p id="mm-results-count" role="status">Loading knowledge…</p>
+      <div id="mm-results" class="mm-results"></div>
+    </aside>
+  <div class="mm-stage">
+    <div id="mm-graph" class="mm-graph"></div>
+    <div id="mm-empty" class="mm-empty" hidden>
+      {% with hint_id="memory-map", hint_title="No kenkeep knowledge base yet", hint_body="The memory map draws the typed notes kenkeep keeps under <code>.ai/kenkeep/nodes/</code> (and under <code>agents/&lt;Project&gt;/.ai/kenkeep/nodes/</code> for per-project stores). None were found.", hint_prompt="Install kenkeep in this repo following docs/KENKEEP.md, then run /kk-bootstrap to seed the knowledge base from our existing markdown docs.", hint_doc="docs/KENKEEP.md" %}{% include "_empty_hint.html" %}{% endwith %}
+    </div>
+
+    <aside id="mm-panel" class="mm-panel" aria-hidden="true">
+      <button id="mm-panel-close" class="mm-panel-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="mm-panel-kind" id="mm-panel-kind"></div>
+      <h2 class="mm-panel-title" id="mm-panel-title"></h2>
+      <div class="mm-panel-tags" id="mm-panel-tags"></div>
+      <div class="mm-panel-body" id="mm-panel-body"></div>
+      <div class="mm-panel-rel" id="mm-panel-rel"></div>
+    </aside>
+  </div>
+
+  </div>
+
+  <section id="mm-curation" class="mm-curation" hidden aria-label="Nightly curation activity">
+    <div class="mm-curation-head">
+      <span class="mm-eyebrow">Nightly Curation</span>
+      <h2 class="mm-curation-title">Curation Activity</h2>
+      <span class="mm-curation-summary" id="mm-curation-summary"></span>
+    </div>
+    <div class="mm-curation-strip" id="mm-curation-strip" role="list"></div>
+    <div class="mm-curation-detail" id="mm-curation-detail" hidden aria-live="polite"></div>
+    <div class="mm-curation-legend">
+      <span><span class="mm-cur-key mm-cur-key-added" aria-hidden="true"></span>found new nodes</span>
+      <span><span class="mm-cur-key mm-cur-key-empty" aria-hidden="true"></span>ran, nothing durable</span>
+      <span class="mm-cur-hint">newest first &middot; click a green day to highlight the nodes it added</span>
+    </div>
+  </section>
+</div>
+
+<style>
+.mm-page { display: flex; flex-direction: column; height: calc(100vh - 3.5rem - 4.75rem); min-height: 520px; }
+.mm-toolbar { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.mm-eyebrow { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--on-surface-variant); }
+.mm-stats { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--on-surface-variant); flex-wrap: wrap; align-items: center; }
+.mm-stats b { color: var(--on-surface); font-weight: 700; }
+/* Isolation badge: the stats line reports one agent's counts while isolated, so
+   it needs to say which agent, unmistakably. */
+.mm-stat-iso { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.6875rem; font-weight: 600; color: var(--primary); border: 1px solid var(--outline-variant); border-radius: 0.4rem; padding: 0.1rem 0.4rem; }
+.mm-stats .mm-muted { font-size: 0.75rem; }
+.mm-modes { display: inline-flex; border: 1px solid var(--outline-variant); border-radius: 0.5rem; overflow: hidden; }
+.mm-mode { background: var(--background); color: var(--on-surface-variant); border: none; border-right: 1px solid var(--outline-variant); padding: 0.4rem 0.7rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.mm-mode:last-child { border-right: none; }
+.mm-mode:hover { background: var(--surface-container); color: var(--on-surface); }
+.mm-mode.is-active { background: var(--primary); color: var(--background); }
+.mm-3d { background: var(--background); color: var(--on-surface-variant); border: 1px solid var(--outline-variant); border-radius: 0.5rem; padding: 0.4rem 0.75rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; cursor: pointer; transition: background 0.12s, color 0.12s, border-color 0.12s; }
+.mm-3d:hover { background: var(--surface-container); color: var(--on-surface); }
+.mm-3d.is-on { background: var(--accent); color: var(--background); border-color: transparent; }
+.mm-layers { display: inline-flex; border: 1px solid var(--outline-variant); border-radius: 0.5rem; overflow: hidden; }
+.mm-layer { background: var(--surface-container); color: var(--on-surface); border: none; border-right: 1px solid var(--outline-variant); padding: 0.4rem 0.6rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; cursor: pointer; transition: background 0.12s, color 0.12s, opacity 0.12s; }
+.mm-layer:last-child { border-right: none; }
+.mm-layer:not(.is-active) { background: var(--background); color: var(--on-surface-variant); opacity: 0.55; }
+.mm-layer:hover { color: var(--on-surface); opacity: 1; }
+.mm-layer.is-empty { opacity: 0.3; cursor: default; text-decoration: line-through; }
+.mm-leg-cue { color: var(--on-surface-variant); }
+.mm-leg-lineage { display: inline-flex; align-items: center; gap: 0.35rem; }
+.mm-leg-lineage::before { content: ""; display: inline-block; width: 18px; height: 0; border-top: 2px dashed #fbbf24; }
+.mm-filter { margin-left: auto; background: var(--background); border: 1px solid var(--outline-variant); color: var(--on-surface); border-radius: 0.5rem; padding: 0.4rem 0.7rem; font-size: 0.8125rem; width: 240px; }
+.mm-filter:focus { outline: none; border-color: var(--primary); }
+.mm-legend { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--on-surface-variant); flex-wrap: wrap; align-items: center; }
+.mm-proj-legend { display: inline-flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.mm-leg-div { width: 1px; height: 0.9rem; background: var(--outline-variant); }
+.mm-leg-label { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--on-surface-variant); }
+/* Agent swatches are toggle buttons: click one to highlight only that agent's
+   nodes. Styled to still read as a legend key, not a button bar. */
+.mm-leg-proj { display: inline-flex; align-items: center; background: none; border: 1px solid transparent; border-radius: 0.4rem; padding: 0.15rem 0.4rem; margin: 0; font: inherit; font-size: 0.75rem; color: var(--on-surface-variant); cursor: pointer; transition: background 0.12s, color 0.12s, opacity 0.12s, border-color 0.12s; }
+.mm-leg-proj:hover { color: var(--on-surface); background: var(--surface-container); }
+.mm-leg-proj:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.mm-leg-proj.is-active { color: var(--on-surface); background: var(--surface-container); border-color: var(--outline-variant); font-weight: 600; }
+.mm-leg-proj.is-dim { opacity: 0.4; }
+.mm-leg-proj.is-dim:hover { opacity: 1; }
+.mm-leg-count { margin-left: 0.35rem; font-size: 0.6875rem; font-variant-numeric: tabular-nums; color: var(--on-surface-variant); opacity: 0.8; }
+.mm-dot { display: inline-block; width: 10px; height: 10px; border-radius: 999px; margin-right: 0.35rem; vertical-align: middle; }
+
+.mm-stage { position: relative; flex: 1; border: 1px solid var(--outline-variant); border-radius: 1rem; overflow: hidden; background: var(--background); }
+.mm-graph { position: absolute; inset: 0; }
+.mm-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; text-align: center; padding: 2rem; }
+/* The `hidden` attribute must win over the display:flex above (equal
+   specificity would otherwise let display:flex show it always). */
+.mm-empty[hidden] { display: none; }
+.mm-empty code { background: var(--surface-container); padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.8125rem; }
+.mm-muted { color: var(--on-surface-variant); font-size: 0.8125rem; }
+
+.mm-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 380px; max-width: 90%; background: var(--surface-container-low); border-left: 1px solid var(--outline-variant); box-shadow: 0 8px 32px rgba(0,0,0,0.4); transform: translateX(100%); transition: transform 0.2s ease; padding: 1.5rem; overflow-y: auto; }
+.mm-panel.open { transform: translateX(0); }
+.mm-panel-close { position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; padding: 0.25rem; border-radius: 0.375rem; }
+.mm-panel-close:hover { background: var(--surface-container); color: var(--on-surface); }
+.mm-panel-kind { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.4rem; }
+.mm-panel-title { font-size: 1.125rem; font-weight: 800; line-height: 1.25; margin: 0 1.5rem 0.75rem 0; }
+.mm-panel-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
+.mm-tag { font-size: 0.6875rem; color: var(--accent); background: var(--accent-muted); padding: 0.1rem 0.45rem; border-radius: 0.25rem; }
+.mm-panel-body { font-size: 0.85rem; line-height: 1.55; color: var(--on-surface); }
+.mm-panel-body p { margin: 0 0 0.75rem; }
+.mm-panel-body code { background: var(--surface-container); padding: 0.05rem 0.3rem; border-radius: 0.25rem; font-size: 0.8em; }
+.mm-panel-body ul { margin: 0 0 0.75rem; padding-left: 1.1rem; }
+.mm-panel-rel { margin-top: 1rem; border-top: 1px solid var(--outline-variant); padding-top: 1rem; }
+.mm-rel-head { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--on-surface-variant); margin-bottom: 0.5rem; }
+.mm-rel-item { display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; background: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; padding: 0.35rem 0.4rem; border-radius: 0.375rem; font-size: 0.8125rem; }
+.mm-rel-item:hover { background: var(--surface-container); color: var(--on-surface); }
+
+  .mm-example-note { font-size: 0.8rem; color: var(--on-surface-variant); margin: 0 0 0.75rem; }
+  .mm-page { height: auto; min-height: calc(100vh - 9rem); }
+  #mm-view-note:empty { display: none; }
+  #mm-view-note { color: var(--warning-text); font-size: 0.8rem; margin: 0 0 0.5rem; }
+  .mm-workspace { display: flex; min-height: 520px; height: 62vh; gap: 0.75rem; }
+  .mm-browser { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; padding: 1rem; background: var(--surface-container-low); border: 1px solid var(--outline-variant); border-radius: 1rem; }
+  .mm-browser label { font-weight: 600; font-size: 0.9rem; }
+  .mm-browser .mm-filter { width: 100%; margin: 0.6rem 0 0; box-sizing: border-box; }
+  #mm-results-count { font-size: 0.75rem; color: var(--on-surface-variant); margin: 0.6rem 0; }
+  .mm-results { overflow-y: auto; min-height: 0; }
+  .mm-result { display: block; width: 100%; text-align: left; font: inherit; color: var(--on-surface); background: transparent; border: 0; border-bottom: 1px solid var(--outline-variant); padding: 0.75rem 0.4rem; cursor: pointer; }
+  .mm-result:hover, .mm-result[aria-pressed="true"] { background: var(--surface-container-high); }
+  .mm-result strong { display: block; font-size: 0.8rem; line-height: 1.4; }
+  .mm-result small { display: block; color: var(--on-surface-variant); font-size: 0.7rem; margin-top: 0.3rem; }
+  .mm-result p { font-size: 0.75rem; line-height: 1.4; margin: 0.3rem 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .mm-review { padding: 0.8rem 1rem; margin-bottom: 0.75rem; border: 1px solid var(--outline-variant); border-left: 3px solid var(--warning); border-radius: 0.5rem; background: var(--surface-container-low); font-size: 0.8rem; }
+  .mm-review h2 { font-size: 0.9rem; margin: 0 0 0.4rem; }
+  .mm-review p { margin: 0.4rem 0; color: var(--on-surface-variant); }
+  .mm-review details { margin-top: 0.5rem; }
+  .mm-review summary { cursor: pointer; line-height: 1.5; }
+  .mm-review-body { max-height: 220px; overflow: auto; margin: 0.5rem 0; padding: 0.75rem; background: var(--surface-container); line-height: 1.5; }
+  .mm-review-body h3 { font-size: 0.85rem; margin: 0.75rem 0 0.4rem; color: var(--on-surface); }
+  .mm-review-body h3:first-child { margin-top: 0; }
+  .mm-review-body p { color: var(--on-surface); margin: 0.4rem 0 0.75rem; }
+  .mm-review-body code { background: var(--surface-container-high); padding: 0.05rem 0.25rem; border-radius: 0.25rem; }
+  .mm-review-body ul { padding-left: 1.2rem; }
+  .mm-review button { font: inherit; color: var(--on-surface); padding: 0.3rem 0.6rem; background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: 0.3rem; cursor: pointer; }
+  .mm-review button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .mm-review-source { overflow-wrap: anywhere; }
+  .mm-result:focus-visible, .mm-review summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  @media (max-width: 900px) { .mm-workspace { flex-direction: column; height: auto; } .mm-browser { width: auto; max-height: 300px; } .mm-stage { flex: none; height: 480px; } }
+
+  .mm-curation { flex: 0 0 auto; margin-top: 0.85rem; padding: 0.8rem 1rem 0.9rem;
+    background: #11141c; border: 1px solid rgba(148,163,184,0.12); border-radius: 0.9rem; }
+  .mm-curation-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.65rem; }
+  .mm-curation-title { font-size: 0.92rem; font-weight: 600; color: #e2e8f0; margin: 0; }
+  .mm-curation-summary { font-size: 0.78rem; color: #94a3b8; }
+  .mm-curation-summary b { color: #cbd5e1; font-weight: 700; }
+  .mm-curation-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
+    scrollbar-width: thin; scrollbar-color: rgba(148,163,184,0.25) transparent; }
+  .mm-curation-strip::-webkit-scrollbar { height: 5px; }
+  .mm-curation-strip::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); border-radius: 3px; }
+  .mm-cur-day { flex: 0 0 auto; min-width: 48px; padding: 0.38rem 0.5rem; border-radius: 0.5rem;
+    border: 1px solid transparent; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-family: 'SF Mono','Fira Code',monospace; line-height: 1.1;
+    transition: transform .12s, box-shadow .12s, background .12s; }
+  .mm-cur-count { font-size: 0.95rem; font-weight: 700; }
+  .mm-cur-date { font-size: 0.62rem; opacity: 0.7; }
+  .mm-cur-day.is-added { background: rgba(16,185,129,0.14); border-color: rgba(16,185,129,0.35); color: #34d399; cursor: pointer; }
+  .mm-cur-day.is-added:hover { background: rgba(16,185,129,0.24); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(16,185,129,0.18); }
+  .mm-cur-day.is-empty { background: rgba(148,163,184,0.07); border-color: rgba(148,163,184,0.16); color: #64748b; }
+  .mm-cur-day.is-empty .mm-cur-count { color: #475569; font-size: 0.85rem; }
+  .mm-cur-day.has-conflict { border-color: rgba(245,158,11,0.55); }
+  .mm-cur-day.is-selected { box-shadow: 0 0 0 2px #34d399; }
+  .mm-cur-day.is-inert { background: rgba(148,163,184,0.07); border-color: rgba(148,163,184,0.16);
+    color: #64748b; cursor: not-allowed; }
+  .mm-curation-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    margin-top: 0.6rem; padding-top: 0.55rem; border-top: 1px solid rgba(52,211,153,0.18); }
+  .mm-cur-detail-lead { font-size: 0.75rem; color: #94a3b8; margin-right: 0.2rem; }
+  .mm-cur-detail-lead b { color: #34d399; }
+  .mm-cur-detail-missing { font-size: 0.72rem; color: #f59e0b; }
+  .mm-cur-chip { font: inherit; font-size: 0.72rem; color: #a7f3d0; cursor: pointer;
+    background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 999px; padding: 0.18rem 0.55rem; max-width: 26ch;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mm-cur-chip:hover { background: rgba(16,185,129,0.25); color: #d1fae5; }
+  .mm-cur-clear { font: inherit; font-size: 0.72rem; color: #94a3b8; cursor: pointer;
+    background: transparent; border: 1px solid rgba(148,163,184,0.25);
+    border-radius: 999px; padding: 0.18rem 0.55rem; margin-left: auto; }
+  .mm-cur-clear:hover { color: #e2e8f0; border-color: rgba(148,163,184,0.5); }
+  .mm-curation-legend { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+    margin-top: 0.6rem; font-size: 0.72rem; color: #94a3b8; }
+  .mm-cur-key { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: middle; margin-right: 4px; }
+  .mm-cur-key-added { background: rgba(16,185,129,0.6); }
+  .mm-cur-key-empty { background: rgba(148,163,184,0.3); }
+  .mm-cur-hint { margin-left: auto; color: #64748b; }
+</style>
+
+<script src="{{ url_for('static', path='force-graph.min.js') }}"></script>
+<script src="{{ url_for('static', path='3d-force-graph.min.js') }}"></script>
+<script src="{{ url_for('static', path='memory-map.js') }}?v={{ asset_version }}"></script>
+{% endblock %}

@@ -12,4 +12,4 @@ Complete SSO go-live and begin accessibility audit.
 Budget approaching 90%. Need to re-scope remaining work.
 
 :dart: *PLAN FOR NEXT WEEK*
-Finalize Pantheon migration and submit change request.
+Finalize hosting migration and submit change request.
