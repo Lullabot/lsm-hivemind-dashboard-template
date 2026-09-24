@@ -19,6 +19,8 @@ def client():
     "/api/data",
     "/api",
     "/project/ProjectAlpha",
+    "/memory-map",
+    "/api/memory-map",
 ])
 def test_page_loads(client, path):
     response = client.get(path)
@@ -30,3 +32,11 @@ def test_health_returns_json(client):
     # 503 is acceptable on a fresh checkout — some data sources are stale.
     assert response.status_code in (200, 503)
     assert response.headers["content-type"].startswith("application/json")
+
+
+def test_memory_map_hint_shows_only_for_example_store(client, monkeypatch):
+    import app
+    monkeypatch.setattr(app, "kenkeep_sources", lambda: [{"example": True}])
+    assert 'data-hint-id="memory-map-example"' in client.get("/memory-map").text
+    monkeypatch.setattr(app, "kenkeep_sources", lambda: [{"layer": "L1"}])
+    assert 'data-hint-id="memory-map-example"' not in client.get("/memory-map").text
