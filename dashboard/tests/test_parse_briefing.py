@@ -14,17 +14,17 @@ def test_parse_briefing_time_bars(memory_bank):
 
     assert len(result["time_bars"]) == 3
     bars_by_name = {b["name"]: b for b in result["time_bars"]}
-    assert bars_by_name["CATIC"]["hours"] == 45.5
-    assert bars_by_name["SDSU"]["hours"] == 89.2
-    # SDSU should be 100% (highest)
-    assert bars_by_name["SDSU"]["pct"] == 100
+    assert bars_by_name["ProjectAlpha"]["hours"] == 45.5
+    assert bars_by_name["ProjectBeta"]["hours"] == 89.2
+    # ProjectBeta should be 100% (highest)
+    assert bars_by_name["ProjectBeta"]["pct"] == 100
 
 
 def test_parse_briefing_changes(memory_bank):
     result = parse_briefing()
 
     assert len(result["changes"]) == 2
-    assert result["changes"][0]["project"] == "CATIC"
+    assert result["changes"][0]["project"] == "ProjectAlpha"
     assert "PR #101" in result["changes"][0]["text"]
 
 
@@ -32,14 +32,14 @@ def test_parse_briefing_attention(memory_bank):
     result = parse_briefing()
 
     assert len(result["attention"]) == 2
-    assert result["attention"][0]["project"] == "CATIC"
+    assert result["attention"][0]["project"] == "ProjectAlpha"
 
 
 def test_parse_briefing_questions(memory_bank):
     result = parse_briefing()
 
     assert len(result["questions"]) == 1
-    assert result["questions"][0]["label"] == "ManhattanU"
+    assert result["questions"][0]["label"] == "ProjectDelta"
 
 
 def test_parse_briefing_missing_file(tmp_path, monkeypatch):

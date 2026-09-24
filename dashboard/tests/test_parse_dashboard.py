@@ -8,9 +8,9 @@ def test_parse_dashboard_happy_path(memory_bank):
 
     assert result["updated"] == "2026-04-19"
     assert len(result["projects"]) == 2
-    assert result["projects"][0]["name"] == "CATIC"
+    assert result["projects"][0]["name"] == "ProjectAlpha"
     assert result["projects"][0]["status_class"] == "on-track"
-    assert result["projects"][1]["name"] == "SDSU"
+    assert result["projects"][1]["name"] == "ProjectBeta"
     assert result["projects"][1]["status_class"] == "at-risk"
 
 
@@ -18,7 +18,7 @@ def test_parse_dashboard_priorities(memory_bank):
     result = parse_dashboard()
 
     assert len(result["priorities"]) == 2
-    assert result["priorities"][0]["project"] == "CATIC"
+    assert result["priorities"][0]["project"] == "ProjectAlpha"
     assert "SSO" in result["priorities"][0]["text"]
 
 
@@ -32,18 +32,18 @@ def test_parse_dashboard_themes(memory_bank):
 def test_parse_dashboard_details(memory_bank):
     result = parse_dashboard()
 
-    assert "CATIC" in result["details"]
-    catic = result["details"]["CATIC"]
-    assert catic["hours_logged"] == 45.5
-    assert catic["hours_total"] == 120
-    assert catic["budget_pct"] == 38
-    assert len(catic["work_items"]) == 2
-    assert catic["blockers"] == "None"
-    assert catic["open_prs"] == ["101", "102"]
+    assert "ProjectAlpha" in result["details"]
+    projectalpha = result["details"]["ProjectAlpha"]
+    assert projectalpha["hours_logged"] == 45.5
+    assert projectalpha["hours_total"] == 120
+    assert projectalpha["budget_pct"] == 38
+    assert len(projectalpha["work_items"]) == 2
+    assert projectalpha["blockers"] == "None"
+    assert projectalpha["open_prs"] == ["101", "102"]
 
-    sdsu = result["details"]["SDSU"]
-    assert sdsu["hours_logged"] == 89.2
-    assert sdsu["blockers"] == "DNS propagation delay"
+    projectbeta = result["details"]["ProjectBeta"]
+    assert projectbeta["hours_logged"] == 89.2
+    assert projectbeta["blockers"] == "DNS propagation delay"
 
 
 def test_parse_dashboard_missing_file(tmp_path, monkeypatch):

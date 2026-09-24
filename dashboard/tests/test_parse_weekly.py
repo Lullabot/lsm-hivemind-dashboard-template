@@ -13,14 +13,14 @@ def test_parse_weekly_happy_path(memory_bank):
 def test_parse_weekly_project_sections(memory_bank):
     result = parse_weekly()
 
-    catic = result["projects"][0]
-    assert catic["name"] == "CATIC"
-    assert "SSO" in catic["concerns"]
-    assert "accessibility audit" in catic["plan"]
+    projectalpha = result["projects"][0]
+    assert projectalpha["name"] == "ProjectAlpha"
+    assert "SSO" in projectalpha["concerns"]
+    assert "accessibility audit" in projectalpha["plan"]
 
-    sdsu = result["projects"][1]
-    assert sdsu["name"] == "SDSU"
-    assert "90%" in sdsu["concerns"]
+    projectbeta = result["projects"][1]
+    assert projectbeta["name"] == "ProjectBeta"
+    assert "90%" in projectbeta["concerns"]
 
 
 def test_parse_weekly_missing_file(tmp_path, monkeypatch):

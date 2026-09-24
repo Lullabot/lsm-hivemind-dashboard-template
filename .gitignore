@@ -7,6 +7,6 @@ __pycache__/
 !.env.example
 .DS_Store
 *.swp
-dashboard/data/bravo-jira.json
 .claude/logs/
 .pytest_cache/
+dashboard/data/kenkeep-curation-history.jsonl

@@ -9,7 +9,7 @@ def test_parse_geekbot_happy_path(memory_bank):
     assert result["date"] == "Friday, April 18, 2026"
     assert len(result["sections"]) == 3
     assert result["sections"][0]["title"] == "What's new since yesterday?"
-    assert "CATIC SSO" in result["sections"][0]["content"]
+    assert "ProjectAlpha SSO" in result["sections"][0]["content"]
     assert result["sections"][2]["title"] == "Anything blocking your progress?"
 
 

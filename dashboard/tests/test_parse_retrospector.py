@@ -17,7 +17,7 @@ def test_parse_retrospector_improvements(memory_bank):
     assert len(result["improvements"]) == 2
     imp = result["improvements"][0]
     assert imp["category"] == "Tool Discipline"
-    assert imp["source_agent"] == "SDSU"
+    assert imp["source_agent"] == "ProjectBeta"
     assert imp["confidence"] == "High"
     # Details from JSON should be merged
     assert "Read before Edit" in imp["description"]
@@ -30,7 +30,7 @@ def test_parse_retrospector_effectiveness(memory_bank):
 
     assert len(result["effectiveness"]) == 1
     eff = result["effectiveness"][0]
-    assert eff["source_agent"] == "SDSU"
+    assert eff["source_agent"] == "ProjectBeta"
     assert eff["verdict"] == "Effective"
 
 

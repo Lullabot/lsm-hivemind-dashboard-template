@@ -3,21 +3,21 @@
 ## Time Balance (Last 30 Days)
 
 ```text
-CATIC          ████████░░  45.5h
-SDSU           ██████████  89.2h
-Elk Grove      ███░░░░░░░  15.0h
+ProjectAlpha          ████████░░  45.5h
+ProjectBeta           ██████████  89.2h
+ProjectGamma      ███░░░░░░░  15.0h
 ```
 
 ## What Changed Overnight
 
-- **CATIC:** Merged [PR #101](https://github.com/Lullabot/caticsite/pull/101) for SSO fix
-- **SDSU:** Closed issue #200 — DNS resolved
+- **ProjectAlpha:** Merged [PR #101](https://github.com/example-org/project-alpha/pull/101) for SSO fix
+- **ProjectBeta:** Closed issue #200 — DNS resolved
 
 ## Needs Attention Today
 
-- **CATIC: Review SSO staging deployment.** Needs QA sign-off before go-live.
-- **SDSU: Budget at 89%.** Coordinate with David on remaining scope.
+- **ProjectAlpha: Review SSO staging deployment.** Needs QA sign-off before go-live.
+- **ProjectBeta: Budget at 89%.** Coordinate with the client on remaining scope.
 
 ## Open Questions Needing Response
 
-- **ManhattanU** — Waiting on client approval for design comp v3
+- **ProjectDelta** — Waiting on client approval for design comp v3

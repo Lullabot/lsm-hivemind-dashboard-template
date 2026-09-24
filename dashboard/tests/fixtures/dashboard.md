@@ -6,20 +6,20 @@
 
 | Project | Client | Type | Status | Summary |
 |---------|--------|------|--------|---------|
-| CATIC | CATIC | LSM Enhanced | On Track | SOW 2 stability work |
-| SDSU | SDSU | LSM | At Risk | Migration blockers |
+| ProjectAlpha | ProjectAlpha | Retainer | On Track | SOW 2 stability work |
+| ProjectBeta | ProjectBeta | Retainer | At Risk | Migration blockers |
 
 ## Top Priorities by Project
 
-- **CATIC:** Complete SSO integration
-- **SDSU:** Resolve Pantheon migration issues
+- **ProjectAlpha:** Complete SSO integration
+- **ProjectBeta:** Resolve hosting migration issues
 
 ## Cross-Project Themes
 
 - **Accessibility** — ADA Title II compliance across all projects
 - **Performance** — Core Web Vitals optimization
 
-### CATIC
+### ProjectAlpha
 
 **Current Status: On Track (stable)**
 
@@ -34,7 +34,7 @@
 
 **Open PRs:** #101, #102
 
-### SDSU
+### ProjectBeta
 
 **Current Status: At Risk**
 
@@ -42,7 +42,7 @@
 
 **Active Work:**
 
-1. Pantheon migration
+1. hosting migration
 2. Theme updates
 
 **Blockers:** DNS propagation delay

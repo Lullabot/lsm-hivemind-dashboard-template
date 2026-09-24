@@ -4,7 +4,7 @@
       "description": "Use Read before Edit to avoid blind edits",
       "proposed_change": "Add Read call before every Edit",
       "reasoning": "Multiple sessions showed Edit failures due to stale content",
-      "source_agent": "SDSU",
+      "source_agent": "ProjectBeta",
       "change_made": {"file": "feedback_test.md", "action": "created"}
     },
     {
