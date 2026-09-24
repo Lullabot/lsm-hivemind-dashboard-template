@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Memory Map — PM Dashboard{% endblock %}
 {% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Memory Map</h2>
+    <p class="page-subtitle">Knowledge base curated by kenkeep from your Claude Code sessions</p>
+  </div>
+</div>
+
 {% if kenkeep_example %}
 {% set hint_id = "memory-map-example" %}
 {% set hint_title = "This map shows example knowledge" %}
@@ -16,10 +24,6 @@ Don't commit; show me git status when you're done.{% endset %}
 {% endif %}
 <div class="mm-page">
   <div class="mm-toolbar">
-    <div class="mm-heading">
-      <span class="mm-eyebrow">Knowledge Base</span>
-      <h1 class="mm-title">Memory Map</h1>
-    </div>
     <div class="mm-stats" id="mm-stats"></div>
     <div class="mm-modes" role="group" aria-label="Layout">
       <button type="button" class="mm-mode is-active" data-layout="force">Force</button>
@@ -93,9 +97,7 @@ Don't commit; show me git status when you're done.{% endset %}
 <style>
 .mm-page { display: flex; flex-direction: column; height: calc(100vh - 3.5rem - 4.75rem); min-height: 520px; }
 .mm-toolbar { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1rem; flex-wrap: wrap; }
-.mm-heading { display: flex; flex-direction: column; gap: 0.1rem; }
 .mm-eyebrow { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--on-surface-variant); }
-.mm-title { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
 .mm-stats { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--on-surface-variant); flex-wrap: wrap; align-items: center; }
 .mm-stats b { color: var(--on-surface); font-weight: 700; }
 /* Isolation badge: the stats line reports one agent's counts while isolated, so
