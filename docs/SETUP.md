@@ -24,21 +24,40 @@ Python 3.11+ recommended.
 
 ## 3. Describe your projects
 
-Open `config/projects.yml`. Replace the example projects with your own. Each
-entry needs at least a `name` and `color`. GitHub repos and agent
-directories are optional.
+Open `config/projects.yml`. Replace the example projects with your own. This file is the single project roster: the dashboard reads it through `dashboard/config.py`, and any automation scripts you add should read the same file (PyYAML or `yq`). Keep it as the only list of projects so adding, renaming, or archiving one is a single edit.
 
 ```yaml
 projects:
   - name: AcmeCorp
     color: "#6366f1"
+    status: active
+    category: client
     github: acme-org/website
-    client: true
+    kenkeep_tag: acme
 
   - name: Internal
     color: "#64748b"
-    client: false
+    category: internal
+
+  - name: OldClient
+    color: "#a855f7"
+    status: archived
+    archived_on: 2026-04-30
+    category: client
 ```
+
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `name` | yes | Display name, also the URL slug and the key used in `dashboard.md` / `dashboard.json`. |
+| `color` | no | Hex color for charts and badges. Grey if omitted. |
+| `status` | no | `active` (default) or `archived`. Archived projects stay in the file for the record but are hidden from every dashboard view and skipped by scripts. Add `archived_on` if you want the date on record. |
+| `category` | no | `client`, `internal`, or `bucket` (a non-client pool such as support or practice time). Only `client` projects count toward billable-people aggregates. |
+| `client` | no | Older boolean form of `category`. `client: false` means internal. Ignored when `category` is set. |
+| `github` | no | `owner/repo`, used for PR staleness. |
+| `noko_dir` / `agent_dir` | no | Subdirectory of `agents/` for time-entry dumps and meeting notes. Default to `name`. |
+| `kenkeep_tag` | no | Tag that marks this project's nodes in a kenkeep knowledge base, used to color them on the memory map. |
+
+Scripts can read extra keys you add (calendar keywords, time-tracker IDs, chat channels). The dashboard ignores keys it doesn't know. An unknown `status` or `category` value fails loudly at startup rather than silently hiding a project.
 
 ## 4. Set top-level dashboard options
 
@@ -58,6 +77,7 @@ The dashboard reads these paths (all under the repo root by default):
 ```
 memory-bank/
 ├── dashboard.md              # project status table + per-project details
+├── dashboard.json            # optional structured twin of dashboard.md (see INTEGRATIONS.md)
 ├── morning-briefing.md       # daily briefing
 ├── geekbot-standup.md        # daily standup
 ├── weekly-report.md          # weekly PM update
@@ -97,7 +117,8 @@ light up.
 - **Empty dashboard** — make sure `memory-bank/dashboard.md` exists and has
   the project status table.
 - **Missing colors** — every project name in `dashboard.md` must also appear
-  in `config/projects.yml`. The dashboard falls back to grey otherwise.
+  in `config/projects.yml` with `status: active`. The dashboard falls back to grey otherwise.
+- **Dashboard ignores `dashboard.json`** — the sidecar is skipped when it is invalid JSON, has no named projects, or is more than a minute older than `dashboard.md`. Regenerate both together.
 - **No people on /people** — Noko entries live at
   `agents/<Project>/logs/<date>-entries.json`. Without those files, the
   team-activity page is empty by design.

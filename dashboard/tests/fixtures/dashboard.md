@@ -6,13 +6,13 @@
 
 | Project | Client | Type | Status | Summary |
 |---------|--------|------|--------|---------|
-| ProjectAlpha | ProjectAlpha | LSM Enhanced | On Track | SOW 2 stability work |
-| ProjectBeta | ProjectBeta | LSM | At Risk | Migration blockers |
+| ProjectAlpha | ProjectAlpha | Retainer | On Track | SOW 2 stability work |
+| ProjectBeta | ProjectBeta | Retainer | At Risk | Migration blockers |
 
 ## Top Priorities by Project
 
 - **ProjectAlpha:** Complete SSO integration
-- **ProjectBeta:** Resolve Pantheon migration issues
+- **ProjectBeta:** Resolve hosting migration issues
 
 ## Cross-Project Themes
 
@@ -42,7 +42,7 @@
 
 **Active Work:**
 
-1. Pantheon migration
+1. hosting migration
 2. Theme updates
 
 **Blockers:** DNS propagation delay

@@ -11,7 +11,7 @@ credentials inside the app, and lets each PM bring their own integrations.
 
 | Page              | File(s) it reads                                     |
 |-------------------|------------------------------------------------------|
-| `/` (dashboard)   | `memory-bank/dashboard.md`                           |
+| `/` (dashboard)   | `memory-bank/dashboard.json` (preferred) + `memory-bank/dashboard.md` |
 | `/briefing`       | `memory-bank/morning-briefing.md`, `geekbot-standup.md`, `weekly-report.md` |
 | `/people`         | `agents/<Project>/logs/*.json` (Noko-style)          |
 | `/retrospector`   | `memory-bank/retrospector-report.md` + sibling JSON  |
@@ -40,6 +40,32 @@ writes JSON to `dashboard/data/<something>.json` works fine. The dashboard
 will pick it up as long as you add a parser to `dashboard/data.py`.
 
 ## Specific integrations
+
+### Structured dashboard sidecar (`dashboard.json`)
+
+Parsing a status table out of prose is fragile. An agent that bolds a status, adds a column, or reorders rows can make a project vanish from the dashboard without an error. Whatever writes `memory-bank/dashboard.md` should also write `memory-bank/dashboard.json` with the same content in structured form:
+
+```json
+{
+  "updated": "2026-05-13",
+  "projects": [
+    {"name": "ProjectAlpha", "client": "Example Org", "type": "Active development", "status": "On track", "summary": "Sprint 4 in flight."}
+  ],
+  "priorities": [
+    {"project": "ProjectAlpha", "text": "Land the search-relevance experiment."}
+  ],
+  "themes": [
+    {"title": "Accessibility audits", "detail": "Both client projects have audits scheduled."}
+  ]
+}
+```
+
+`name` is required and must match a `name` in `config/projects.yml` for colors to apply. `client` defaults to the project name. `status` is mapped to a CSS class through `status_map` in `config/dashboard.yml`. A theme can also be a plain string.
+
+The dashboard uses the sidecar for the status table, priorities, and themes when it is present, parses as valid JSON, has at least one named project, and is no more than a minute older than `dashboard.md`. Otherwise it falls back to parsing the markdown, so a stale or broken sidecar never hides newer prose. The per-project detail sections (budget, active work, blockers, open PRs) still come from `dashboard.md`. `parse_dashboard()` reports which path it took in its `source` field (`json`, `markdown`, or `none`).
+
+If you generate these files with an LLM, ask for both in the same prompt and have it write the JSON last, after the markdown, so the timestamps line up.
+
 
 ### GitHub PR staleness
 
@@ -81,6 +107,16 @@ To add a brand new data source:
 4. Add the result to `get_all_data()` so templates can render it.
 5. Add a template partial that shows it.
 6. Optional: add the source to the freshness panel in `get_health()`.
+
+## Writing files from the dashboard
+
+The dashboard writes a few files of its own: `dashboard/data/meeting-actions-status.json` (dismissed action items), `dashboard/data/staleness-cache.json` (from `refresh_staleness()`), and the editable standup and weekly-report markdown. All of these go through `dashboard/storage.py`:
+
+- `atomic_write_text` / `atomic_write_json` write to a temp file in the same directory, fsync it, then rename it over the target. A crash mid-write leaves the previous file intact instead of a truncated one.
+- `locked(path)` serializes a read-modify-write on one file across the server's worker threads, so two quick clicks can't both read the old state and drop each other's update. It is an in-process lock, which is enough because the dashboard runs as a single uvicorn process.
+- `load_json_for_update` raises `CorruptStateError` instead of returning an empty default when the file exists but can't be parsed, so a write never replaces an unreadable file with an empty one.
+
+Use the same helpers for any new state file you add. Fetch scripts that write cache files outside the server should follow the same pattern (write to a temp file, then rename).
 
 ## A note on credentials
 
